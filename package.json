@@ -1,0 +1,27 @@
+{
+  "name": "ratrun-core",
+  "version": "0.1.0",
+  "description": "Core smart contracts and infrastructure for RatRun",
+  "main": "index.js",
+  "scripts": {
+    "build": "forge build",
+    "test": "forge test",
+    "deploy": "forge script script/Deploy.s.sol --rpc-url $RPC_URL --broadcast",
+    "frontend:dev": "npm --prefix frontend run dev",
+    "frontend:build": "npm --prefix frontend run build",
+    "subgraph:codegen": "graph codegen subgraph/subgraph.yaml",
+    "subgraph:build": "graph build subgraph/subgraph.yaml"
+  },
+  "keywords": [
+    "solidity",
+    "foundry",
+    "ratrun",
+    "blockchain",
+    "gamefi"
+  ],
+  "author": "duesenbek",
+  "license": "MIT",
+  "devDependencies": {
+    "@graphprotocol/graph-cli": "^0.60.0"
+  }
+}

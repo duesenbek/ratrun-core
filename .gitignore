@@ -1,0 +1,33 @@
+# Foundry
+out/
+cache/
+broadcast/
+.gas-snapshot
+
+# Node.js
+node_modules/
+dist/
+build/
+.next/
+.env*
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Python (if used for subgraph/scripts)
+__pycache__/
+*.py[cod]
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Subgraph
+subgraph/generated/
+subgraph/build/
