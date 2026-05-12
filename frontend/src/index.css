@@ -1,0 +1,62 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 2%;
+    --foreground: 0 0% 92%;
+    
+    --card: 0 0% 7%;
+    --card-foreground: 0 0% 92%;
+ 
+    --popover: 0 0% 7%;
+    --popover-foreground: 0 0% 92%;
+ 
+    --primary: 82 100% 50%;
+    --primary-foreground: 0 0% 9%;
+ 
+    --secondary: 0 0% 15%;
+    --secondary-foreground: 0 0% 92%;
+ 
+    --muted: 0 0% 15%;
+    --muted-foreground: 0 0% 60%;
+ 
+    --accent: 0 0% 15%;
+    --accent-foreground: 0 0% 92%;
+ 
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 92%;
+
+    --border: 0 0% 15%;
+    --input: 0 0% 15%;
+    --ring: 82 100% 50%;
+ 
+    --radius: 0.5rem;
+  }
+}
+
+@layer base {
+  body {
+    @apply bg-background text-foreground font-mono overflow-x-hidden;
+  }
+}
+
+/* Custom RatRun utility classes */
+.term-box {
+  @apply border border-muted bg-card p-4 rounded-md shadow-glow relative;
+}
+
+.term-box::before {
+  content: "";
+  @apply absolute top-0 left-0 w-2 h-2 border-t border-l border-primary -ml-px -mt-px;
+}
+
+.term-box::after {
+  content: "";
+  @apply absolute bottom-0 right-0 w-2 h-2 border-b border-r border-primary -mr-px -mb-px;
+}
+
+.pixel-btn {
+  @apply px-4 py-2 bg-primary text-primary-foreground font-bold hover:bg-opacity-80 transition-all shadow-glow uppercase tracking-wider;
+}
