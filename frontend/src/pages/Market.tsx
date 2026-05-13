@@ -1,5 +1,5 @@
 import { ShoppingCart } from "lucide-react";
-import ngmiSticker from "../assets/stickers/emotion-ngmi.png";
+import ngmiSticker from "../assets/stickers/ngmi.png";
 
 export default function Market() {
   return (

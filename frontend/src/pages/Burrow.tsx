@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { ArrowDownToLine, ArrowUpFromLine, Activity } from "lucide-react";
-import sleepDeprivedSticker from "../assets/stickers/emotion-sleep-deprived.png";
+import sleepDeprivedSticker from "../assets/stickers/sleep-deprived.png";
 
 export default function Burrow() {
   const [amount, setAmount] = useState("");

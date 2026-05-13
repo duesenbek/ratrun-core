@@ -51,5 +51,3 @@ forge test
 ## 🛡 Security
 For security concerns, please refer to our `audit/` folder or contact the team directly.
 
----
-*Built with passion for the decentralized rat race.*

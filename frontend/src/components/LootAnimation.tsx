@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { PackageOpen, Lock, Pickaxe, Cpu, Zap, Shield, Wrench } from "lucide-react";
-import wagmiSticker from "../assets/stickers/emotion-wagmi.png";
+import wagmiSticker from "../assets/stickers/wagmi.png";
 
 type LootState = "idle" | "opening" | "revealed";
 

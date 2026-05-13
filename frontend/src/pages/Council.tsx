@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Vote, CheckCircle2, XCircle, Clock } from "lucide-react";
-import copiumSticker from "../assets/stickers/emotion-copium.png";
+import copiumSticker from "../assets/stickers/copium.png";
 
 const MOCK_PROPOSALS = [
   {

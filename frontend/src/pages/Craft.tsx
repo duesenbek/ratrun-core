@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Hammer } from "lucide-react";
-import gigaPumpSticker from "../assets/stickers/emotion-giga-pump.png";
+import gigaPumpSticker from "../assets/stickers/giga-pump.png";
 
 const RECIPES = [
   {

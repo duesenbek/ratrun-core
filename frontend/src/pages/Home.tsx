@@ -1,7 +1,7 @@
 import { Link } from "react-router-dom";
 import { useAccount } from "wagmi";
 import { Terminal, Pickaxe, Vault, Users, ShoppingCart } from "lucide-react";
-import gmSticker from "../assets/stickers/emotion-gm.png";
+import gmSticker from "../assets/stickers/gm.png";
 
 export default function Home() {
   const { isConnected } = useAccount();
@@ -89,9 +89,9 @@ export default function Home() {
           <span className="text-xs text-muted">SYSTEM_LOG</span>
         </div>
         <div className="text-xs text-muted font-mono h-24 overflow-y-auto space-y-1">
-          <div>> INITIALIZING RATRUN_OS... OK</div>
-          <div>> CONNECTING TO BASE SEPOLIA... OK</div>
-          <div>> WAITING FOR USER INPUT...</div>
+          <div>{'>'} INITIALIZING RATRUN_OS... OK</div>
+          <div>{'>'} CONNECTING TO BASE SEPOLIA... OK</div>
+          <div>{'>'} WAITING FOR USER INPUT...</div>
         </div>
       </div>
     </div>
