@@ -11,8 +11,10 @@ export default {
       },
       colors: {
         background: '#050505',
+        foreground: '#EAEAEA',
         card: '#111111',
         primary: '#B6FF00',
+        'primary-foreground': '#050505',
         text: '#EAEAEA',
         muted: '#555555',
       },

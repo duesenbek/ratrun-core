@@ -30,11 +30,16 @@ function App() {
     <WagmiProvider config={config}>
       <QueryClientProvider client={queryClient}>
         <Router>
-          <div className="min-h-screen bg-background text-text flex flex-col font-mono selection:bg-primary selection:text-background">
-            <header className="border-b border-muted p-4 flex justify-between items-center bg-card">
-              <a href="/" className="text-xl font-bold tracking-widest text-primary glow-primary hover:text-white transition-colors">
-                RATRUN_OS v0.1
-              </a>
+          <div className="min-h-screen bg-background text-text flex flex-col font-mono selection:bg-primary selection:text-background cyber-grid scanlines relative z-0">
+            <header className="border-b border-primary/30 p-4 flex justify-between items-center bg-black/80 backdrop-blur-md sticky top-0 z-50 shadow-[0_0_15px_rgba(182,255,0,0.1)]">
+              <div className="flex items-center gap-3">
+                <div className="w-2 h-2 bg-primary animate-pulse"></div>
+                <a href="/" className="text-xl font-bold tracking-widest text-primary hover:text-white transition-colors uppercase glitch-text">
+                  <span aria-hidden="true">RATRUN_OS v1.0</span>
+                  RATRUN_OS v1.0
+                  <span aria-hidden="true">RATRUN_OS v1.0</span>
+                </a>
+              </div>
               <WalletConnect />
             </header>
             
