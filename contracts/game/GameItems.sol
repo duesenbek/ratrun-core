@@ -19,19 +19,25 @@ contract GameItems is ERC1155, AccessControl, ERC1155Burnable, ERC1155Supply {
     // ─────────────────────────────────────────────
     // ITEM IDs
     // ─────────────────────────────────────────────
-    uint256 public constant SCRAP   = 0;
+    uint256 public constant SCRAP = 0;
     uint256 public constant BATTERY = 1;
-    uint256 public constant WIRE    = 2;
-    uint256 public constant CHIP    = 3;
-    uint256 public constant RELIC   = 4;
-    uint256 public constant DRILL   = 5;
-    uint256 public constant GPU     = 6;
-    uint256 public constant SERVER  = 7;
+    uint256 public constant WIRE = 2;
+    uint256 public constant CHIP = 3;
+    uint256 public constant RELIC = 4;
+    uint256 public constant DRILL = 5;
+    uint256 public constant GPU = 6;
+    uint256 public constant SERVER = 7;
 
     // ─────────────────────────────────────────────
     // RARITY
     // ─────────────────────────────────────────────
-    enum Rarity { COMMON, UNCOMMON, RARE, EPIC, LEGENDARY }
+    enum Rarity {
+        COMMON,
+        UNCOMMON,
+        RARE,
+        EPIC,
+        LEGENDARY
+    }
 
     /// @notice Rarity tier for each item ID.
     mapping(uint256 => Rarity) public itemRarity;
@@ -39,7 +45,12 @@ contract GameItems is ERC1155, AccessControl, ERC1155Burnable, ERC1155Supply {
     // ─────────────────────────────────────────────
     // EVENTS
     // ─────────────────────────────────────────────
-    event ItemMinted(address indexed to, uint256 indexed id, uint256 amount, Rarity rarity);
+    event ItemMinted(
+        address indexed to,
+        uint256 indexed id,
+        uint256 amount,
+        Rarity rarity
+    );
     event ItemBurned(address indexed from, uint256 indexed id, uint256 amount);
 
     // ─────────────────────────────────────────────
@@ -51,14 +62,14 @@ contract GameItems is ERC1155, AccessControl, ERC1155Burnable, ERC1155Supply {
         _grantRole(BURNER_ROLE, msg.sender);
 
         // Set rarities for each item
-        itemRarity[SCRAP]   = Rarity.COMMON;
+        itemRarity[SCRAP] = Rarity.COMMON;
         itemRarity[BATTERY] = Rarity.COMMON;
-        itemRarity[WIRE]    = Rarity.COMMON;
-        itemRarity[CHIP]    = Rarity.UNCOMMON;
-        itemRarity[RELIC]   = Rarity.RARE;
-        itemRarity[DRILL]   = Rarity.UNCOMMON;
-        itemRarity[GPU]     = Rarity.EPIC;
-        itemRarity[SERVER]  = Rarity.LEGENDARY;
+        itemRarity[WIRE] = Rarity.COMMON;
+        itemRarity[CHIP] = Rarity.UNCOMMON;
+        itemRarity[RELIC] = Rarity.RARE;
+        itemRarity[DRILL] = Rarity.UNCOMMON;
+        itemRarity[GPU] = Rarity.EPIC;
+        itemRarity[SERVER] = Rarity.LEGENDARY;
     }
 
     // ─────────────────────────────────────────────
@@ -66,7 +77,9 @@ contract GameItems is ERC1155, AccessControl, ERC1155Burnable, ERC1155Supply {
     // ─────────────────────────────────────────────
 
     /// @notice Update the base URI (admin only).
-    function setURI(string memory newuri) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    function setURI(
+        string memory newuri
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
         _setURI(newuri);
     }
 
@@ -131,15 +144,26 @@ contract GameItems is ERC1155, AccessControl, ERC1155Burnable, ERC1155Supply {
     /// @notice Sum all 8 item balances for `account` using assembly.
     /// @dev Uses direct storage reads via ERC1155Supply._totalSupply layout
     ///      for gas comparison; the loop version costs ~300 gas more per item.
-    function totalInventoryBalance(address account) external view returns (uint256 total) {
+    function totalInventoryBalance(
+        address account
+    ) external view returns (uint256 total) {
         uint256[8] memory ids = [
-            SCRAP, BATTERY, WIRE, CHIP, RELIC, DRILL, GPU, SERVER
+            SCRAP,
+            BATTERY,
+            WIRE,
+            CHIP,
+            RELIC,
+            DRILL,
+            GPU,
+            SERVER
         ];
         assembly {
             // ids is a memory pointer; iterate 8 slots (each 32 bytes)
             let ptr := ids
             let end := add(ptr, 0x100) // 8 * 32 = 256 bytes
-            for {} lt(ptr, end) { ptr := add(ptr, 0x20) } {
+            for {} lt(ptr, end) {
+                ptr := add(ptr, 0x20)
+            } {
                 // call balanceOf(account, id) via STATICCALL would be
                 // expensive; instead we accumulate via the loop with mload
                 // This demo shows raw memory accumulation pattern.
@@ -159,7 +183,11 @@ contract GameItems is ERC1155, AccessControl, ERC1155Burnable, ERC1155Supply {
             // We load the 8 ids from memory and call balanceOf per item
             // In practice this shows the assembly iteration pattern
             let ptr := ids
-            for { let i := 0 } lt(i, 8) { i := add(i, 1) } {
+            for {
+                let i := 0
+            } lt(i, 8) {
+                i := add(i, 1)
+            } {
                 acc := add(acc, i) // placeholder: real balance reading shown below
             }
         }
@@ -181,12 +209,9 @@ contract GameItems is ERC1155, AccessControl, ERC1155Burnable, ERC1155Supply {
         super._update(from, to, ids, values);
     }
 
-    function supportsInterface(bytes4 interfaceId)
-        public
-        view
-        override(ERC1155, AccessControl)
-        returns (bool)
-    {
+    function supportsInterface(
+        bytes4 interfaceId
+    ) public view override(ERC1155, AccessControl) returns (bool) {
         return super.supportsInterface(interfaceId);
     }
 }

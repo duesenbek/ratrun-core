@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import "@openzeppelin/contracts/token/ERC4626/ERC4626.sol";
+import "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
@@ -18,7 +18,12 @@ contract BurrowVault is ERC4626, ReentrancyGuard, Ownable {
     // ─────────────────────────────────────────────
     // EVENTS
     // ─────────────────────────────────────────────
-    event Deposited(address indexed sender, address indexed owner, uint256 assets, uint256 shares);
+    event Deposited(
+        address indexed sender,
+        address indexed owner,
+        uint256 assets,
+        uint256 shares
+    );
     event Withdrawn(
         address indexed sender,
         address indexed receiver,
@@ -38,32 +43,24 @@ contract BurrowVault is ERC4626, ReentrancyGuard, Ownable {
         IERC20 asset_,
         string memory name_,
         string memory symbol_
-    )
-        ERC4626(asset_)
-        ERC20(name_, symbol_)
-        Ownable(msg.sender)
-    {}
+    ) ERC4626(asset_) ERC20(name_, symbol_) Ownable(msg.sender) {}
 
     // ─────────────────────────────────────────────
     // ERC4626 OVERRIDES — emit our custom events
     // ─────────────────────────────────────────────
 
-    function deposit(uint256 assets, address receiver)
-        public
-        override
-        nonReentrant
-        returns (uint256 shares)
-    {
+    function deposit(
+        uint256 assets,
+        address receiver
+    ) public override nonReentrant returns (uint256 shares) {
         shares = super.deposit(assets, receiver);
         emit Deposited(msg.sender, receiver, assets, shares);
     }
 
-    function mint(uint256 shares, address receiver)
-        public
-        override
-        nonReentrant
-        returns (uint256 assets)
-    {
+    function mint(
+        uint256 shares,
+        address receiver
+    ) public override nonReentrant returns (uint256 assets) {
         assets = super.mint(shares, receiver);
         emit Deposited(msg.sender, receiver, assets, shares);
     }
@@ -72,12 +69,7 @@ contract BurrowVault is ERC4626, ReentrancyGuard, Ownable {
         uint256 assets,
         address receiver,
         address owner
-    )
-        public
-        override
-        nonReentrant
-        returns (uint256 shares)
-    {
+    ) public override nonReentrant returns (uint256 shares) {
         shares = super.withdraw(assets, receiver, owner);
         emit Withdrawn(msg.sender, receiver, owner, assets, shares);
     }
@@ -86,12 +78,7 @@ contract BurrowVault is ERC4626, ReentrancyGuard, Ownable {
         uint256 shares,
         address receiver,
         address owner
-    )
-        public
-        override
-        nonReentrant
-        returns (uint256 assets)
-    {
+    ) public override nonReentrant returns (uint256 assets) {
         assets = super.redeem(shares, receiver, owner);
         emit Withdrawn(msg.sender, receiver, owner, assets, shares);
     }

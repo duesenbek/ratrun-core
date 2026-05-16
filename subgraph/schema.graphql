@@ -1,0 +1,115 @@
+type Player @entity {
+  id: ID!
+  address: Bytes!
+  totalCrafted: BigInt!
+  totalMazeRuns: BigInt!
+  totalSurvived: BigInt!
+  totalScrapEarned: BigInt!
+  vaultShares: BigInt!
+  itemBalances: [ItemBalance!]! @derivedFrom(field: "player")
+  craftEvents: [CraftEvent!]! @derivedFrom(field: "crafter")
+  mazeRuns: [MazeRun!]! @derivedFrom(field: "player")
+  vaultDeposits: [VaultDeposit!]! @derivedFrom(field: "owner")
+}
+
+type ItemBalance @entity {
+  id: ID!
+  player: Player!
+  itemId: BigInt!
+  amount: BigInt!
+  lastUpdated: BigInt!
+}
+
+type ItemMintEvent @entity {
+  id: ID!
+  to: Bytes!
+  itemId: BigInt!
+  amount: BigInt!
+  rarity: Int!
+  blockNumber: BigInt!
+  timestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type ItemBurnEvent @entity {
+  id: ID!
+  from: Bytes!
+  itemId: BigInt!
+  amount: BigInt!
+  blockNumber: BigInt!
+  timestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type CraftEvent @entity {
+  id: ID!
+  crafter: Player!
+  recipeId: BigInt!
+  outputAmount: BigInt!
+  blockNumber: BigInt!
+  timestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type Recipe @entity {
+  id: ID!
+  recipeId: BigInt!
+  outputItemId: BigInt!
+  outputAmount: BigInt!
+  active: Boolean!
+  createdAt: BigInt!
+  totalCrafts: BigInt!
+}
+
+type MazeRun @entity {
+  id: ID!
+  player: Player!
+  riskLevel: Int!
+  survived: Boolean
+  scrapEarned: BigInt!
+  lootItemId: BigInt
+  startedAt: BigInt!
+  resolvedAt: BigInt
+  transactionHash: Bytes!
+}
+
+type VaultDeposit @entity {
+  id: ID!
+  sender: Bytes!
+  owner: Player!
+  assets: BigInt!
+  shares: BigInt!
+  blockNumber: BigInt!
+  timestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type VaultWithdraw @entity {
+  id: ID!
+  sender: Bytes!
+  receiver: Bytes!
+  owner: Bytes!
+  assets: BigInt!
+  shares: BigInt!
+  blockNumber: BigInt!
+  timestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type VaultPosition @entity {
+  id: ID!
+  owner: Bytes!
+  shares: BigInt!
+  totalDeposited: BigInt!
+  totalWithdrawn: BigInt!
+  lastUpdated: BigInt!
+}
+
+type Protocol @entity {
+  id: ID!
+  totalItemsMinted: BigInt!
+  totalItemsBurned: BigInt!
+  totalCrafts: BigInt!
+  totalMazeRuns: BigInt!
+  totalVaultDeposits: BigInt!
+}
