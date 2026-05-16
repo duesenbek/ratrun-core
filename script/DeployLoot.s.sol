@@ -29,15 +29,12 @@ contract DeployLoot is Script {
     ///      Update from: https://docs.chain.link/vrf/v2-5/supported-networks
     address constant VRF_WRAPPER = 0x7a1BaC17Ccc5b313516C5E16fb24f7659aA5ebed;
 
-    /// @dev Deployed GameItems address.
-    address constant GAME_ITEMS  = 0xDeAdBeef00000000000000000000000000000004; // replace
-
-    /// @dev RatMaze address (for MAZE_ROLE grant).
-    address constant RAT_MAZE    = 0xDeAdBeef00000000000000000000000000000005; // replace
+    address constant GAME_ITEMS = 0xdEadbeef00000000000000000000000000000004; // replace
+    address constant RAT_MAZE = 0xDEadbEeF00000000000000000000000000000005; // replace
 
     function run() external {
         uint256 deployerKey = vm.envUint("DEPLOYER_PRIVATE_KEY");
-        address deployer    = vm.addr(deployerKey);
+        address deployer = vm.addr(deployerKey);
 
         console2.log("=== DeployLoot ===");
         console2.log("Deployer:   ", deployer);
@@ -58,7 +55,11 @@ contract DeployLoot is Script {
 
         console2.log("");
         console2.log("=== MANUAL STEPS REQUIRED ===");
-        console2.log("1. Call gameItems.grantRole(MINTER_ROLE, ", address(lootDrop), ")");
+        console2.log(
+            "1. Call gameItems.grantRole(MINTER_ROLE, ",
+            address(lootDrop),
+            ")"
+        );
         console2.log("2. Fund LootDrop with LINK for VRF payments.");
         console2.log("=== DeployLoot complete ===");
     }

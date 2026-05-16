@@ -21,13 +21,13 @@ contract DeployMarket is Script {
     // ─────────────────────────────────────────────
     // CONFIG — override via env for mainnet
     // ─────────────────────────────────────────────
-    address constant TREASURY     = 0xDeAdBeef00000000000000000000000000000001; // replace
-    address constant SCRAP_TOKEN  = 0xDeAdBeef00000000000000000000000000000002; // replace
-    address constant BATTERY_TOKEN = 0xDeAdBeef00000000000000000000000000000003; // replace
+    address constant TREASURY = 0xdEADbeEF00000000000000000000000000000001; // replace
+    address constant SCRAP_TOKEN = 0xdeADbeEf00000000000000000000000000000002; // replace
+    address constant BATTERY_TOKEN = 0xdEaDBeef00000000000000000000000000000003; // replace
 
     function run() external {
         uint256 deployerKey = vm.envUint("DEPLOYER_PRIVATE_KEY");
-        address deployer    = vm.addr(deployerKey);
+        address deployer = vm.addr(deployerKey);
 
         console2.log("=== DeployMarket ===");
         console2.log("Deployer:", deployer);

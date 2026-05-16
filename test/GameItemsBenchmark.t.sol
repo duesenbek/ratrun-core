@@ -14,14 +14,14 @@ contract GameItemsBenchmarkTest is Test {
         items.grantRole(items.MINTER_ROLE(), minter);
 
         vm.startPrank(minter);
-        items.mint(player, GameItems.SCRAP,   100, "");
-        items.mint(player, GameItems.BATTERY, 50, "");
-        items.mint(player, GameItems.WIRE,    25, "");
-        items.mint(player, GameItems.CHIP,    10, "");
-        items.mint(player, GameItems.RELIC,   5, "");
-        items.mint(player, GameItems.DRILL,   2, "");
-        items.mint(player, GameItems.GPU,     1, "");
-        items.mint(player, GameItems.SERVER,  1, "");
+        items.mint(player, 0, 100, ""); // SCRAP
+        items.mint(player, 1, 50, ""); // BATTERY
+        items.mint(player, 2, 25, ""); // WIRE
+        items.mint(player, 3, 10, ""); // CHIP
+        items.mint(player, 4, 5, ""); // RELIC
+        items.mint(player, 5, 2, ""); // DRILL
+        items.mint(player, 6, 1, ""); // GPU
+        items.mint(player, 7, 1, ""); // SERVER
         vm.stopPrank();
     }
 
