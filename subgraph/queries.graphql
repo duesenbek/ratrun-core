@@ -1,0 +1,104 @@
+# Query 1: Player inventory — used on /inventory page
+query GetPlayerInventory($address: ID!) {
+  player(id: $address) {
+    id
+    totalCrafted
+    totalMazeRuns
+    totalSurvived
+    totalScrapEarned
+    vaultShares
+    itemBalances {
+      itemId
+      amount
+      lastUpdated
+    }
+  }
+}
+
+# Query 2: Player craft history — used on /craft page
+query GetPlayerCraftHistory($address: String!, $first: Int!) {
+  craftEvents(
+    where: { crafter: $address }
+    orderBy: timestamp
+    orderDirection: desc
+    first: $first
+  ) {
+    id
+    recipeId
+    outputAmount
+    timestamp
+    transactionHash
+  }
+}
+
+# Query 3: All active recipes — used for crafting UI
+query GetRecipes {
+  recipes(where: { active: true }, orderBy: totalCrafts, orderDirection: desc) {
+    id
+    recipeId
+    outputItemId
+    outputAmount
+    totalCrafts
+    createdAt
+  }
+}
+
+# Query 4: Vault leaderboard — used on /burrow page
+query GetVaultLeaderboard($first: Int!) {
+  vaultPositions(orderBy: shares, orderDirection: desc, first: $first) {
+    id
+    owner
+    shares
+    totalDeposited
+    totalWithdrawn
+    lastUpdated
+  }
+}
+
+# Query 5: Maze run history — used on /maze history page
+query GetMazeRuns($first: Int!, $riskLevel: Int) {
+  mazeRuns(
+    where: { riskLevel: $riskLevel }
+    orderBy: startedAt
+    orderDirection: desc
+    first: $first
+  ) {
+    id
+    player { id address }
+    riskLevel
+    survived
+    scrapEarned
+    lootItemId
+    startedAt
+    resolvedAt
+  }
+}
+
+# Query 6: Protocol-wide stats — used on /home dashboard
+query GetProtocolStats {
+  protocol(id: "1") {
+    totalItemsMinted
+    totalItemsBurned
+    totalCrafts
+    totalMazeRuns
+    totalVaultDeposits
+  }
+}
+
+# Query 7: Recent mint events for an item — used in activity feed
+query GetRecentMints($itemId: BigInt!, $first: Int!) {
+  itemMintEvents(
+    where: { itemId: $itemId }
+    orderBy: timestamp
+    orderDirection: desc
+    first: $first
+  ) {
+    id
+    to
+    itemId
+    amount
+    rarity
+    timestamp
+    transactionHash
+  }
+}

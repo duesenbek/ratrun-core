@@ -1,12 +1,11 @@
 [profile.default]
-src = 'contracts'
-out = 'out'
-libs = ['lib']
-test = 'test'
-cache_path = 'cache'
-
-optimizer        = true
-optimizer_runs   = 200
+src            = 'contracts'
+out            = 'out'
+libs           = ['lib']
+test           = 'test'
+cache_path     = 'cache'
+optimizer      = true
+optimizer_runs = 200
 
 remappings = [
   "@openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/",
@@ -21,12 +20,20 @@ fuzz = { runs = 500 }
 [profile.invariant]
 invariant = { runs = 256, depth = 15 }
 
+[profile.ci]
+fuzz      = { runs = 256 }
+invariant = { runs = 64, depth = 16 }
+
 [rpc_endpoints]
-mainnet      = "${MAINNET_RPC_URL}"
-sepolia      = "${SEPOLIA_RPC_URL}"
-base_sepolia = "${BASE_SEPOLIA_RPC_URL}"
+mainnet          = "${MAINNET_RPC_URL}"
+sepolia          = "${SEPOLIA_RPC_URL}"
+base_sepolia     = "${BASE_SEPOLIA_RPC_URL}"
+arbitrum_sepolia = "${ARBITRUM_SEPOLIA_RPC_URL}"
+optimism_sepolia = "${OPTIMISM_SEPOLIA_RPC_URL}"
 
 [etherscan]
-mainnet      = { key = "${ETHERSCAN_API_KEY}" }
-sepolia      = { key = "${ETHERSCAN_API_KEY}" }
-base_sepolia = { key = "${BASESCAN_API_KEY}", url = "https://api-sepolia.basescan.org/api" }
+mainnet          = { key = "${ETHERSCAN_API_KEY}" }
+sepolia          = { key = "${ETHERSCAN_API_KEY}" }
+base_sepolia     = { key = "${BASESCAN_API_KEY}",  url = "https://api-sepolia.basescan.org/api" }
+arbitrum_sepolia = { key = "${ARBISCAN_API_KEY}",  url = "https://api-sepolia.arbiscan.io/api" }
+optimism_sepolia = { key = "${OPSCAN_API_KEY}",    url = "https://api-sepolia-optimism.etherscan.io/api" }

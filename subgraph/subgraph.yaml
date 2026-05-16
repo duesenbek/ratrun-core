@@ -1,0 +1,101 @@
+specVersion: 0.0.5
+schema:
+  file: ./schema.graphql
+dataSources:
+  - kind: ethereum
+    name: GameItems
+    network: base-sepolia
+    source:
+      address: "0x0000000000000000000000000000000000000000"
+      abi: GameItems
+      startBlock: 0
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.7
+      language: wasm/assemblyscript
+      entities:
+        - Player
+        - ItemBalance
+        - ItemMintEvent
+        - ItemBurnEvent
+      abis:
+        - name: GameItems
+          file: ./abis/GameItems.json
+      eventHandlers:
+        - event: ItemMinted(indexed address,indexed uint256,uint256,uint8)
+          handler: handleItemMinted
+        - event: ItemBurned(indexed address,indexed uint256,uint256)
+          handler: handleItemBurned
+      file: ./src/gameItems.ts
+  - kind: ethereum
+    name: CraftingEngine
+    network: base-sepolia
+    source:
+      address: "0x0000000000000000000000000000000000000000"
+      abi: CraftingEngine
+      startBlock: 0
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.7
+      language: wasm/assemblyscript
+      entities:
+        - CraftEvent
+        - Recipe
+      abis:
+        - name: CraftingEngine
+          file: ./abis/CraftingEngine.json
+      eventHandlers:
+        - event: Crafted(indexed address,indexed uint256,uint256)
+          handler: handleCrafted
+        - event: RecipeAdded(indexed uint256,uint256,uint256)
+          handler: handleRecipeAdded
+      file: ./src/craftingEngine.ts
+  - kind: ethereum
+    name: BurrowVault
+    network: base-sepolia
+    source:
+      address: "0x0000000000000000000000000000000000000000"
+      abi: BurrowVault
+      startBlock: 0
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.7
+      language: wasm/assemblyscript
+      entities:
+        - VaultDeposit
+        - VaultWithdraw
+        - VaultPosition
+      abis:
+        - name: BurrowVault
+          file: ./abis/BurrowVault.json
+      eventHandlers:
+        - event: Deposit(indexed address,indexed address,uint256,uint256)
+          handler: handleDeposited
+        - event: Withdraw(indexed address,indexed address,indexed address,uint256,uint256)
+          handler: handleWithdrawn
+      file: ./src/burrowVault.ts
+  - kind: ethereum
+    name: RatMaze
+    network: base-sepolia
+    source:
+      address: "0x0000000000000000000000000000000000000000"
+      abi: RatMaze
+      startBlock: 0
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.7
+      language: wasm/assemblyscript
+      entities:
+        - MazeRun
+        - Player
+      abis:
+        - name: RatMaze
+          file: ./abis/RatMaze.json
+      eventHandlers:
+        - event: RunStarted(indexed address,uint8)
+          handler: handleRunStarted
+        - event: RunSurvived(indexed address,uint8,uint256,uint256)
+          handler: handleRunSurvived
+        - event: RunCaught(indexed address,uint8)
+          handler: handleRunCaught
+      file: ./src/ratMaze.ts
