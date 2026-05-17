@@ -2,10 +2,11 @@ import { useReadContract, useWriteContract, useAccount, useWaitForTransactionRec
 import { parseAbi } from "viem";
 import { CONTRACT_ADDRESSES } from "../contracts/addresses";
 import { RatMazeABI } from "../contracts/abis";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 
 export function useRatMaze() {
   const { address, isConnected } = useAccount();
+  const [localPending, setLocalPending] = useState(false);
 
   // Read active run
   const { data: activeRunData, refetch: refetchActiveRun } = useReadContract({
@@ -15,9 +16,22 @@ export function useRatMaze() {
     args: address ? [address] : undefined,
     query: {
       enabled: isConnected && !!address,
-      refetchInterval: 5000, // Poll every 5s to keep UI updated
+      refetchInterval: 3000, // Poll every 3s to keep UI updated
     }
   });
+
+  // Derived state with robust support for both array tuples and named objects
+  const isActive = activeRunData
+    ? (Array.isArray(activeRunData)
+        ? (activeRunData[2] ?? false)
+        : (activeRunData as any).isActive ?? (activeRunData as any).active ?? false)
+    : false;
+
+  const currentZone = activeRunData
+    ? (Array.isArray(activeRunData)
+        ? (activeRunData[1] ?? 0)
+        : (activeRunData as any).riskLevel ?? 0)
+    : 0;
 
   // Read remaining time
   const { data: remainingTimeData, refetch: refetchRemainingTime } = useReadContract({
@@ -26,45 +40,61 @@ export function useRatMaze() {
     functionName: "getRemainingTime",
     args: address ? [address] : undefined,
     query: {
-      enabled: isConnected && !!address && activeRunData?.[2] === true,
+      enabled: isConnected && !!address && isActive === true,
       refetchInterval: 1000, // Poll every 1s for countdown
     }
   });
 
-  const { writeContract, data: txHash, isPending } = useWriteContract();
+  const { writeContract, data: txHash, isPending, reset } = useWriteContract();
   
-  const { isLoading: isTxConfirming, isSuccess: isTxSuccess } = useWaitForTransactionReceipt({
+  const { isLoading: isTxConfirming, isSuccess: isTxSuccess, isError: isTxError } = useWaitForTransactionReceipt({
     hash: txHash,
   });
 
   const enterMaze = (riskLevel: number) => {
+    setLocalPending(true);
     writeContract({
       address: CONTRACT_ADDRESSES.ratMaze,
       abi: parseAbi([...RatMazeABI]),
       functionName: "enterMaze",
       args: [riskLevel],
+    }, {
+      onError: () => {
+        setLocalPending(false);
+      }
     });
   };
 
   const claimLoot = () => {
+    setLocalPending(true);
     writeContract({
       address: CONTRACT_ADDRESSES.ratMaze,
       abi: parseAbi([...RatMazeABI]),
       functionName: "claimLoot",
+    }, {
+      onError: () => {
+        setLocalPending(false);
+      }
     });
   };
 
-  // Refetch when transaction completes
+  // Turn off local pending and reset writeContract state when tx completes or errors
   useEffect(() => {
-    if (isTxSuccess) {
+    if (isTxSuccess || isTxError) {
       refetchActiveRun();
       refetchRemainingTime();
+      setLocalPending(false);
+      if (reset) reset();
     }
-  }, [isTxSuccess, refetchActiveRun, refetchRemainingTime]);
+  }, [isTxSuccess, isTxError, refetchActiveRun, refetchRemainingTime, reset]);
 
-  // Derived state
-  const isActive = activeRunData?.[2] ?? false;
-  const currentZone = activeRunData?.[1] ?? 0;
+  // Self-healing: if contract state says we are active, we are definitely not pending deployment
+  useEffect(() => {
+    if (isActive) {
+      setLocalPending(false);
+    }
+  }, [isActive]);
+
   const remainingTimeSeconds = remainingTimeData ? Number(remainingTimeData) : 0;
   const isFinished = isActive && remainingTimeSeconds === 0;
 
@@ -75,7 +105,7 @@ export function useRatMaze() {
     isFinished,
     enterMaze,
     claimLoot,
-    isPending: isPending || isTxConfirming,
+    isPending: isPending || isTxConfirming || localPending,
     isTxSuccess
   };
 }
