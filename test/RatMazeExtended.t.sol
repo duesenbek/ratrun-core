@@ -2,22 +2,33 @@
 pragma solidity ^0.8.24;
 
 import "forge-std/Test.sol";
-import "../../contracts/game/RatMaze.sol";
-import "../../contracts/game/GameItems.sol";
+import "../contracts/game/RatMaze.sol";
+import "../contracts/game/GameItems.sol";
+
+/// @dev Minimal stub so claimLoot() doesn't revert when lootProvider is unset.
+contract MockLootProviderExtended {
+    function requestLoot(address, uint8) external pure returns (uint256) {
+        return 1;
+    }
+}
 
 contract RatMazeExtendedTest is Test {
     RatMaze   public maze;
     GameItems public items;
 
-    address admin  = address(this);
-    address player = makeAddr("player");
+    address admin   = address(this);
+    address player  = makeAddr("player");
     address player2 = makeAddr("player2");
 
     function setUp() public {
         items = new GameItems("https://ratrun.io/api/items/{id}.json");
         maze  = new RatMaze(address(items));
         items.grantRole(items.MINTER_ROLE(), address(maze));
-        vm.deal(player, 1 ether);
+
+        MockLootProviderExtended loot = new MockLootProviderExtended();
+        maze.setLootProvider(address(loot));
+
+        vm.deal(player,  1 ether);
         vm.deal(player2, 1 ether);
     }
 
@@ -47,20 +58,20 @@ contract RatMazeExtendedTest is Test {
 
     function test_EnterMaze_InvalidZone_Reverts() public {
         vm.prank(player);
-        vm.expectRevert("Invalid risk level");
+        vm.expectRevert(RatMaze.RatMaze__InvalidRiskLevel.selector);
         maze.enterMaze(4);
     }
 
     function test_EnterMaze_ZeroZone_Reverts() public {
         vm.prank(player);
-        vm.expectRevert("Invalid risk level");
+        vm.expectRevert(RatMaze.RatMaze__InvalidRiskLevel.selector);
         maze.enterMaze(0);
     }
 
     function test_EnterMaze_AlreadyActive_Reverts() public {
         vm.startPrank(player);
         maze.enterMaze(1);
-        vm.expectRevert("Already in a run");
+        vm.expectRevert(RatMaze.RatMaze__AlreadyInRun.selector);
         maze.enterMaze(2);
         vm.stopPrank();
     }
@@ -68,14 +79,14 @@ contract RatMazeExtendedTest is Test {
     function test_ClaimLoot_TooEarly_Reverts() public {
         vm.startPrank(player);
         maze.enterMaze(1);
-        vm.expectRevert("Run not finished yet");
+        vm.expectRevert(RatMaze.RatMaze__RunNotFinished.selector);
         maze.claimLoot();
         vm.stopPrank();
     }
 
     function test_ClaimLoot_NoRun_Reverts() public {
         vm.prank(player);
-        vm.expectRevert("No active run");
+        vm.expectRevert(RatMaze.RatMaze__NoActiveRun.selector);
         maze.claimLoot();
     }
 
