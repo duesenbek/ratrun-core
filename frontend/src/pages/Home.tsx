@@ -3,21 +3,37 @@ import { Link } from "react-router-dom";
 import { useAccount } from "wagmi";
 import { Terminal, Pickaxe, Vault, Users, ShoppingCart, Crosshair, Zap, Shield, ChevronRight, Activity } from "lucide-react";
 import gmSticker from "../assets/stickers/gm.png";
+import { useRatMaze } from "../hooks/useRatMaze";
+import { useInventory } from "../hooks/useInventory";
 
 export default function Home() {
   const { isConnected } = useAccount();
   const [selectedZone, setSelectedZone] = useState<number>(1);
-  const [isDeploying, setIsDeploying] = useState<boolean>(false);
-  const [activeRun, setActiveRun] = useState<boolean>(false);
+  const [systemLogs, setSystemLogs] = useState<string[]>([
+    "> [04:00:11] INITIALIZING RATRUN_OS... OK",
+    "> [04:00:12] CONNECTING TO BASE SEPOLIA... OK"
+  ]);
+
+  const { isActive, remainingTimeSeconds, isFinished, enterMaze, claimLoot, isPending } = useRatMaze();
+  const { scrapBalance } = useInventory();
+
+  // Format time (MM:SS)
+  const formatTime = (seconds: number) => {
+    const m = Math.floor(seconds / 60).toString().padStart(2, '0');
+    const s = (seconds % 60).toString().padStart(2, '0');
+    return `${m}:${s}`;
+  };
 
   const handleDeploy = () => {
     if (!isConnected) return;
-    setIsDeploying(true);
-    // Simulate transaction delay
-    setTimeout(() => {
-      setIsDeploying(false);
-      setActiveRun(true);
-    }, 2000);
+    enterMaze(selectedZone);
+    setSystemLogs(prev => [...prev, `> [SYSTEM] DEPLOYING RUNNER TO ZONE ${selectedZone}...`]);
+  };
+
+  const handleClaim = () => {
+    if (!isConnected) return;
+    claimLoot();
+    setSystemLogs(prev => [...prev, `> [SYSTEM] CLAIMING LOOT...`]);
   };
 
   return (
@@ -77,7 +93,7 @@ export default function Home() {
                   <Zap className="w-4 h-4 text-yellow-500" />
                 </div>
                 <div className="text-2xl text-primary font-mono font-bold tracking-wider">
-                  {isConnected ? "1,337.00" : "0.00"}
+                  {isConnected ? scrapBalance.toLocaleString(undefined, {minimumFractionDigits: 2}) : "0.00"}
                 </div>
               </div>
               
@@ -86,9 +102,16 @@ export default function Home() {
                   <span className="text-xs text-muted">NEXT LOOT DROP</span>
                   <Shield className="w-4 h-4 text-blue-500" />
                 </div>
-                <div className="text-xl text-white font-mono tracking-wider">04:20:00</div>
-                <div className="w-full h-1 bg-white/10 mt-2 rounded-full overflow-hidden">
-                  <div className="h-full bg-blue-500 w-[65%]"></div>
+                <div className="text-xl text-white font-mono tracking-wider">
+                  {isActive ? formatTime(remainingTimeSeconds) : "00:00"}
+                </div>
+                <div className="w-full h-1 bg-white/10 mt-2 rounded-full overflow-hidden relative">
+                  {isActive && remainingTimeSeconds > 0 && (
+                    <div className="h-full bg-blue-500 animate-pulse w-full"></div>
+                  )}
+                  {isFinished && (
+                    <div className="h-full bg-green-500 w-full shadow-[0_0_10px_rgba(34,197,94,0.8)]"></div>
+                  )}
                 </div>
               </div>
             </div>
@@ -103,16 +126,11 @@ export default function Home() {
               </div>
               <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
             </div>
-            <div className="text-xs text-primary/80 font-mono overflow-y-auto space-y-2 flex-1 scrollbar-hide">
-              <div className="opacity-50">{'>'} [04:00:11] INITIALIZING RATRUN_OS... OK</div>
-              <div className="opacity-70">{'>'} [04:00:12] CONNECTING TO BASE SEPOLIA... OK</div>
-              <div className="opacity-80">{'>'} [04:00:14] FETCHING CONTRACT STATE... OK</div>
-              {isConnected ? (
-                <div className="text-white">{'>'} [04:00:15] USER AUTHENTICATED. READY FOR DEPLOYMENT.</div>
-              ) : (
-                <div className="text-red-400">{'>'} [04:00:15] WAITING FOR WALLET CONNECTION...</div>
-              )}
+            <div className="text-xs text-primary/80 font-mono overflow-y-auto space-y-2 flex-1 scrollbar-hide flex flex-col-reverse">
               <div className="animate-pulse">{'>'} _</div>
+              {systemLogs.map((log, index) => (
+                <div key={index} className="text-white opacity-90">{log}</div>
+              ))}
             </div>
           </div>
         </div>
@@ -184,24 +202,36 @@ export default function Home() {
                 </div>
               </div>
 
-              {!activeRun ? (
+              {!isActive ? (
                 <button 
                   onClick={handleDeploy}
-                  disabled={!isConnected || isDeploying}
+                  disabled={!isConnected || isPending}
                   className="pixel-btn w-full text-xl py-4 flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed group/btn hover:scale-105"
                 >
-                  {isDeploying ? (
+                  {isPending ? (
                     <span className="animate-pulse">DEPLOYING...</span>
                   ) : (
                     <>DEPLOY RAT <ChevronRight className="w-6 h-6 group-hover/btn:translate-x-2 transition-transform" /></>
                   )}
                 </button>
+              ) : isFinished ? (
+                <button 
+                  onClick={handleClaim}
+                  disabled={isPending}
+                  className="w-full text-xl py-4 flex items-center justify-center gap-3 bg-green-500/20 text-green-500 border border-green-500/50 hover:bg-green-500 hover:text-white transition-all uppercase tracking-wider font-bold shadow-[0_0_15px_rgba(34,197,94,0.4)] disabled:opacity-50 disabled:cursor-not-allowed group/btn hover:scale-105"
+                >
+                  {isPending ? (
+                    <span className="animate-pulse">CLAIMING...</span>
+                  ) : (
+                    <>CLAIM LOOT <Pickaxe className="w-6 h-6" /></>
+                  )}
+                </button>
               ) : (
                 <button 
-                  onClick={() => setActiveRun(false)}
-                  className="w-full text-xl py-4 flex items-center justify-center gap-3 bg-red-500/20 text-red-500 border border-red-500/50 hover:bg-red-500 hover:text-white transition-all uppercase tracking-wider font-bold shadow-[0_0_15px_rgba(239,68,68,0.2)]"
+                  disabled
+                  className="w-full text-xl py-4 flex items-center justify-center gap-3 bg-blue-500/10 text-blue-500 border border-blue-500/30 transition-all uppercase tracking-wider font-bold opacity-70 cursor-not-allowed"
                 >
-                  CANCEL RUN (DEMO)
+                  <span className="animate-pulse">RUNNER DEPLOYED - {formatTime(remainingTimeSeconds)}</span>
                 </button>
               )}
             </div>
