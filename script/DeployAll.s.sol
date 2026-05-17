@@ -57,7 +57,7 @@ contract DeployAll is Script {
         address treasury = vm.envOr("TREASURY_ADDRESS", deployer); // defaults to deployer
 
         console2.log("=================================================");
-        console2.log("  RatRun Protocol — Full Deploy (Base Sepolia)");
+        console2.log("  RatRun Protocol - Full Deploy (Base Sepolia)");
         console2.log("=================================================");
         console2.log("Deployer :", deployer);
         console2.log("Treasury :", treasury);
