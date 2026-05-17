@@ -40,11 +40,23 @@ jobs:
           BASESCAN_API_KEY: ${{ secrets.BASESCAN_API_KEY }}
           TREASURY_ADDRESS: ${{ secrets.TREASURY_ADDRESS }}
         run: |
+          # Use fallback public RPC if secret is empty
+          RPC_URL="${BASE_SEPOLIA_RPC_URL:-https://sepolia.base.org}"
+          echo "Using RPC URL: $RPC_URL"
+
+          # Only verify if API key is provided
+          VERIFY_FLAGS=""
+          if [ -n "$BASESCAN_API_KEY" ]; then
+            echo "BaseScan API Key detected. Verification enabled."
+            VERIFY_FLAGS="--verify --etherscan-api-key $BASESCAN_API_KEY"
+          else
+            echo "No BaseScan API Key detected. Skipping verification."
+          fi
+          
           forge script script/DeployAll.s.sol \
-            --rpc-url $BASE_SEPOLIA_RPC_URL \
+            --rpc-url "$RPC_URL" \
             --broadcast \
-            --verify \
-            --etherscan-api-key $BASESCAN_API_KEY \
+            $VERIFY_FLAGS \
             -vvvv 2>&1 | tee deploy-output.txt
 
           echo "Deploy output saved to deploy-output.txt"
