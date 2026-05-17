@@ -25,6 +25,7 @@ export default function Craft() {
   const [isCrafting, setIsCrafting] = useState(false);
 
   const handleCraft = (id: number) => {
+    console.log("Crafting recipe:", id);
     setIsCrafting(true);
     // Simulate transaction
     setTimeout(() => setIsCrafting(false), 2000);

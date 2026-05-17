@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useAccount } from "wagmi";
 import { Terminal, Pickaxe, Vault, Users, ShoppingCart, Crosshair, Zap, Shield, ChevronRight, Activity } from "lucide-react";
@@ -5,6 +6,19 @@ import gmSticker from "../assets/stickers/gm.png";
 
 export default function Home() {
   const { isConnected } = useAccount();
+  const [selectedZone, setSelectedZone] = useState<number>(1);
+  const [isDeploying, setIsDeploying] = useState<boolean>(false);
+  const [activeRun, setActiveRun] = useState<boolean>(false);
+
+  const handleDeploy = () => {
+    if (!isConnected) return;
+    setIsDeploying(true);
+    // Simulate transaction delay
+    setTimeout(() => {
+      setIsDeploying(false);
+      setActiveRun(true);
+    }, 2000);
+  };
 
   return (
     <div className="max-w-6xl mx-auto space-y-8 animate-in fade-in duration-700 relative z-10 pb-20">
@@ -128,9 +142,12 @@ export default function Home() {
               
               <div className="grid grid-cols-3 gap-4 mb-8 flex-1">
                 {/* Zone 1 */}
-                <div className="border border-green-500/30 bg-green-900/10 p-4 flex flex-col items-center text-center cursor-pointer hover:border-green-500 hover:bg-green-500/10 transition-all group/zone relative">
+                <div 
+                  onClick={() => setSelectedZone(1)}
+                  className={`border ${selectedZone === 1 ? 'border-primary ring-2 ring-primary bg-primary/10' : 'border-green-500/30 bg-green-900/10'} p-4 flex flex-col items-center text-center cursor-pointer hover:border-green-500 hover:bg-green-500/10 transition-all group/zone relative`}
+                >
                   <div className="absolute top-0 right-0 p-1 text-xs text-green-500 font-bold opacity-50">Z-1</div>
-                  <h3 className="font-bold text-white mb-1 group-hover/zone:text-green-400">SEWER GRID</h3>
+                  <h3 className={`font-bold mb-1 ${selectedZone === 1 ? 'text-primary' : 'text-white group-hover/zone:text-green-400'}`}>SEWER GRID</h3>
                   <div className="text-xs text-muted mb-2">Safe • Low Yield</div>
                   <div className="mt-auto w-full">
                     <div className="text-xs flex justify-between mb-1"><span className="text-muted">Survival:</span> <span className="text-green-500">90%</span></div>
@@ -139,9 +156,12 @@ export default function Home() {
                 </div>
 
                 {/* Zone 2 */}
-                <div className="border border-yellow-500/50 bg-yellow-900/20 p-4 flex flex-col items-center text-center cursor-pointer hover:border-yellow-500 hover:bg-yellow-500/10 transition-all group/zone relative shadow-[0_0_15px_rgba(234,179,8,0.15)]">
+                <div 
+                  onClick={() => setSelectedZone(2)}
+                  className={`border ${selectedZone === 2 ? 'border-primary ring-2 ring-primary bg-primary/10' : 'border-yellow-500/50 bg-yellow-900/20'} p-4 flex flex-col items-center text-center cursor-pointer hover:border-yellow-500 hover:bg-yellow-500/10 transition-all group/zone relative shadow-[0_0_15px_rgba(234,179,8,0.15)]`}
+                >
                   <div className="absolute top-0 right-0 p-1 text-xs text-yellow-500 font-bold opacity-50">Z-2</div>
-                  <h3 className="font-bold text-white mb-1 group-hover/zone:text-yellow-400">MAINFRAME</h3>
+                  <h3 className={`font-bold mb-1 ${selectedZone === 2 ? 'text-primary' : 'text-white group-hover/zone:text-yellow-400'}`}>MAINFRAME</h3>
                   <div className="text-xs text-muted mb-2">Risky • Med Yield</div>
                   <div className="mt-auto w-full">
                     <div className="text-xs flex justify-between mb-1"><span className="text-muted">Survival:</span> <span className="text-yellow-500">70%</span></div>
@@ -150,9 +170,12 @@ export default function Home() {
                 </div>
 
                 {/* Zone 3 */}
-                <div className="border border-red-500/30 bg-red-900/10 p-4 flex flex-col items-center text-center cursor-pointer hover:border-red-500 hover:bg-red-500/10 transition-all group/zone relative">
+                <div 
+                  onClick={() => setSelectedZone(3)}
+                  className={`border ${selectedZone === 3 ? 'border-primary ring-2 ring-primary bg-primary/10' : 'border-red-500/30 bg-red-900/10'} p-4 flex flex-col items-center text-center cursor-pointer hover:border-red-500 hover:bg-red-500/10 transition-all group/zone relative`}
+                >
                   <div className="absolute top-0 right-0 p-1 text-xs text-red-500 font-bold opacity-50">Z-3</div>
-                  <h3 className="font-bold text-white mb-1 group-hover/zone:text-red-400">THE CORE</h3>
+                  <h3 className={`font-bold mb-1 ${selectedZone === 3 ? 'text-primary' : 'text-white group-hover/zone:text-red-400'}`}>THE CORE</h3>
                   <div className="text-xs text-muted mb-2">Deadly • High Yield</div>
                   <div className="mt-auto w-full">
                     <div className="text-xs flex justify-between mb-1"><span className="text-muted">Survival:</span> <span className="text-red-500">45%</span></div>
@@ -161,12 +184,26 @@ export default function Home() {
                 </div>
               </div>
 
-              <button 
-                disabled={!isConnected}
-                className="pixel-btn w-full text-xl py-4 flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed group/btn hover:scale-105"
-              >
-                DEPLOY RAT <ChevronRight className="w-6 h-6 group-hover/btn:translate-x-2 transition-transform" />
-              </button>
+              {!activeRun ? (
+                <button 
+                  onClick={handleDeploy}
+                  disabled={!isConnected || isDeploying}
+                  className="pixel-btn w-full text-xl py-4 flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed group/btn hover:scale-105"
+                >
+                  {isDeploying ? (
+                    <span className="animate-pulse">DEPLOYING...</span>
+                  ) : (
+                    <>DEPLOY RAT <ChevronRight className="w-6 h-6 group-hover/btn:translate-x-2 transition-transform" /></>
+                  )}
+                </button>
+              ) : (
+                <button 
+                  onClick={() => setActiveRun(false)}
+                  className="w-full text-xl py-4 flex items-center justify-center gap-3 bg-red-500/20 text-red-500 border border-red-500/50 hover:bg-red-500 hover:text-white transition-all uppercase tracking-wider font-bold shadow-[0_0_15px_rgba(239,68,68,0.2)]"
+                >
+                  CANCEL RUN (DEMO)
+                </button>
+              )}
             </div>
           </div>
 

@@ -1,4 +1,4 @@
-import { ShoppingCart, AlertTriangle, Shield, Battery, Cpu, Lock, ChevronRight } from "lucide-react";
+import { AlertTriangle, Shield, Battery, Cpu, Lock, ChevronRight } from "lucide-react";
 import ngmiSticker from "../assets/stickers/ngmi.png";
 
 const MOCK_ITEMS = [

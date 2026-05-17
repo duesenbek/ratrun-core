@@ -25,12 +25,12 @@ contract DeployLoot is Script {
     // CONFIG — override with real addresses
     // ─────────────────────────────────────────────
 
-    /// @dev Chainlink VRFV2PlusWrapper on Base Sepolia.
+        /// @dev Chainlink VRFV2PlusWrapper on Base Sepolia.
     ///      Update from: https://docs.chain.link/vrf/v2-5/supported-networks
-    address constant VRF_WRAPPER = 0x7a1BaC17Ccc5b313516C5E16fb24f7659aA5ebed;
+    address constant VRF_WRAPPER = 0x7a1BaC17Ccc5b313516C5E16fb24f7659aA5ebed; // default for Base Sepolia
 
-    address constant GAME_ITEMS = 0xdEadbeef00000000000000000000000000000004; // replace
-    address constant RAT_MAZE = 0xDEadbEeF00000000000000000000000000000005; // replace
+    address GAME_ITEMS = vm.envAddress("GAME_ITEMS_ADDRESS");
+    address RAT_MAZE = vm.envAddress("RAT_MAZE_ADDRESS");
 
     function run() external {
         uint256 deployerKey = vm.envUint("DEPLOYER_PRIVATE_KEY");
