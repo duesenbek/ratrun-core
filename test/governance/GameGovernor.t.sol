@@ -27,7 +27,7 @@ contract GameGovernorTest is Test {
 
     function setUp() public {
         rat = new GovernanceToken(deployer, INITIAL);
-        items = new GameItems("https://ratrun.io/api/items/{id}.json");
+        items = new GameItems("");
         maze = new RatMaze(address(items));
 
         address[] memory proposers = new address[](0);

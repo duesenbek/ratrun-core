@@ -43,7 +43,7 @@ contract LootDropTest is Test {
     address player = makeAddr("player");
 
     function setUp() public {
-        items    = new GameItems("https://ratrun.io/api/items/{id}.json");
+        items    = new GameItems("");
         vrf      = new MockVRFWrapper();
         lootDrop = new LootDrop(admin, address(items), address(vrf));
 

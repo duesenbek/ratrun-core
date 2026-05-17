@@ -123,6 +123,10 @@ contract ResourceAMM_InvariantTest is Test {
             makeAddr("treasury")
         );
 
+        // Align local token references with the AMM's sorted tokens to avoid mismatches
+        token0 = InvMockERC20(address(amm.token0()));
+        token1 = InvMockERC20(address(amm.token1()));
+
         handler = new ResourceAMM_InvariantHandler(amm, token0, token1);
 
         // Seed initial liquidity so pool is non-empty

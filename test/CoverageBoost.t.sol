@@ -332,7 +332,7 @@ contract GameGovernorCoverageTest is Test {
 
     function setUp() public {
         rat = new GovernanceToken(deployer, INITIAL);
-        items = new GameItems("https://ratrun.io/api/items/{id}.json");
+        items = new GameItems("");
         maze = new RatMaze(address(items));
 
         address[] memory proposers = new address[](0);
@@ -431,7 +431,7 @@ contract CraftingEngineV2CoverageTest is Test {
     uint256 constant GPU = 6;
 
     function setUp() public {
-        items = new GameItems("https://ratrun.io/api/items/{id}.json");
+        items = new GameItems("");
 
         CraftingEngine v1Impl = new CraftingEngine();
         bytes memory initData = abi.encodeCall(
