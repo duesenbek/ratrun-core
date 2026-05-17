@@ -28,7 +28,8 @@ invariant = { runs = 64, depth = 16 }
 no_match_path = "script/*"
 
 [rpc_endpoints]
-mainnet = "https://ethereum.publicnode.com"
+mainnet      = "https://ethereum.publicnode.com"
+base_sepolia = "${BASE_SEPOLIA_RPC_URL}"
 
 [etherscan]
 mainnet          = { key = "${ETHERSCAN_API_KEY}" }
