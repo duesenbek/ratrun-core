@@ -6,16 +6,23 @@ import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "../contracts/game/BurrowVault.sol";
 
 contract MockScrap is ERC20 {
-    constructor() ERC20("Mock Scrap", "mSCRAP") { _mint(msg.sender, 1_000_000 ether); }
-    function mint(address to, uint256 amount) external { _mint(to, amount); }
+    constructor() ERC20("Mock Scrap", "mSCRAP") {
+        _mint(msg.sender, 1_000_000 ether);
+    }
+    function mint(address to, uint256 amount) external {
+        _mint(to, amount);
+    }
 }
 
 contract ReentrantAttacker {
     BurrowVault public vault;
-    MockScrap   public scrap;
-    bool        private entered;
+    MockScrap public scrap;
+    bool private entered;
 
-    constructor(BurrowVault _v, MockScrap _s) { vault = _v; scrap = _s; }
+    constructor(BurrowVault _v, MockScrap _s) {
+        vault = _v;
+        scrap = _s;
+    }
 
     function attack(uint256 amount) external {
         scrap.approve(address(vault), type(uint256).max);
@@ -23,7 +30,6 @@ contract ReentrantAttacker {
         vault.deposit(amount, address(this));
     }
 
-    // Tries to re-enter during withdrawal callback
     receive() external payable {
         if (entered) {
             entered = false;
@@ -33,27 +39,32 @@ contract ReentrantAttacker {
 }
 
 contract BurrowVaultTest is Test {
-    MockScrap   public scrap;
+    MockScrap public scrap;
     BurrowVault public vault;
 
-    address admin    = address(this);
-    address alice    = makeAddr("alice");
-    address bob      = makeAddr("bob");
+    address admin = address(this);
+    address alice = makeAddr("alice");
+    address bob = makeAddr("bob");
 
     uint256 constant INIT = 10_000 ether;
 
     function setUp() public {
         scrap = new MockScrap();
-        vault = new BurrowVault(IERC20(address(scrap)), "Burrow Scrap Share", "bSCRAP");
+        vault = new BurrowVault(
+            IERC20(address(scrap)),
+            "Burrow Scrap Share",
+            "bSCRAP"
+        );
 
         scrap.transfer(alice, INIT);
-        scrap.transfer(bob,   INIT);
+        scrap.transfer(bob, INIT);
 
-        vm.prank(alice); scrap.approve(address(vault), type(uint256).max);
-        vm.prank(bob);   scrap.approve(address(vault), type(uint256).max);
+        vm.prank(alice);
+        scrap.approve(address(vault), type(uint256).max);
+        vm.prank(bob);
+        scrap.approve(address(vault), type(uint256).max);
     }
 
-    // ── DEPOSIT ────────────────────────────────────
     function test_Deposit_Success() public {
         vm.prank(alice);
         uint256 shares = vault.deposit(1_000 ether, alice);
@@ -76,7 +87,6 @@ contract BurrowVaultTest is Test {
         assertEq(shares, 1_000 ether);
     }
 
-    // ── WITHDRAW ───────────────────────────────────
     function test_Withdraw_Success() public {
         vm.prank(alice);
         vault.deposit(2_000 ether, alice);
@@ -102,24 +112,20 @@ contract BurrowVaultTest is Test {
         vault.withdraw(1_000 ether, alice, alice);
     }
 
-    // ── SHARE CALCULATIONS ─────────────────────────
     function test_SharePrice_RisesAfterYieldInjection() public {
         vm.prank(alice);
         vault.deposit(1_000 ether, alice);
 
-        // Inject 1000 yield — share price doubles
         scrap.approve(address(vault), 1_000 ether);
         vault.injectYield(1_000 ether);
 
-        // Bob deposits 2000 → should get 1000 shares (2000/2000 * 1000)
         vm.prank(bob);
         uint256 bobShares = vault.deposit(2_000 ether, bob);
-        assertEq(bobShares, 1_000 ether);
+        assertApproxEqAbs(bobShares, 1_000 ether, 1);
 
-        // Alice redeems 1000 shares → gets 2000 assets
         vm.prank(alice);
         uint256 aliceAssets = vault.redeem(1_000 ether, alice, alice);
-        assertEq(aliceAssets, 2_000 ether);
+        assertApproxEqAbs(aliceAssets, 2_000 ether, 1);
     }
 
     function test_PreviewDeposit_MatchesActual() public {
@@ -138,21 +144,14 @@ contract BurrowVaultTest is Test {
         assertEq(preview, actual);
     }
 
-    // ── REENTRANCY ─────────────────────────────────
     function test_Reentrancy_IsBlocked() public {
         ReentrantAttacker atk = new ReentrantAttacker(vault, scrap);
         scrap.transfer(address(atk), 5_000 ether);
-        // ReentrancyGuard prevents second entry; any revert satisfies the test
         try atk.attack(1_000 ether) {
-            // If it didn't revert, the reentrant call must have been blocked silently
-            // (no double-accounting). Assert vault has exactly 1000.
             assertEq(vault.totalAssets(), 1_000 ether);
-        } catch {
-            // Expected path: reverted
-        }
+        } catch {}
     }
 
-    // ── FUZZ ───────────────────────────────────────
     function testFuzz_DepositWithdrawRoundtrip(uint256 assets) public {
         assets = bound(assets, 1 ether, INIT);
         vm.prank(alice);

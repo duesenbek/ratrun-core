@@ -10,29 +10,35 @@ import "../../contracts/game/RatMaze.sol";
 import "../../contracts/game/GameItems.sol";
 
 contract GameGovernorTest is Test {
-    GovernanceToken    public rat;
+    GovernanceToken public rat;
     TimelockController public timelock;
-    GameGovernor       public governor;
-    Treasury           public treasury;
-    RatMaze            public maze;
-    GameItems          public items;
+    GameGovernor public governor;
+    Treasury public treasury;
+    RatMaze public maze;
+    GameItems public items;
 
     address deployer = address(this);
-    address alice    = makeAddr("alice");
-    address bob      = makeAddr("bob");
-    address carol    = makeAddr("carol");
+    address alice = makeAddr("alice");
+    address bob = makeAddr("bob");
+    address carol = makeAddr("carol");
+    address poorUser = makeAddr("poorUser"); // no tokens — below threshold
 
     uint256 constant INITIAL = 10_000_000e18;
 
     function setUp() public {
-        rat   = new GovernanceToken(deployer, INITIAL);
+        rat = new GovernanceToken(deployer, INITIAL);
         items = new GameItems("https://ratrun.io/api/items/{id}.json");
-        maze  = new RatMaze(address(items));
+        maze = new RatMaze(address(items));
 
         address[] memory proposers = new address[](0);
         address[] memory executors = new address[](1);
         executors[0] = address(0);
-        timelock = new TimelockController(2 days, proposers, executors, deployer);
+        timelock = new TimelockController(
+            2 days,
+            proposers,
+            executors,
+            deployer
+        );
 
         governor = new GameGovernor(IVotes(address(rat)), timelock);
         treasury = new Treasury(address(timelock), address(rat));
@@ -45,28 +51,38 @@ contract GameGovernorTest is Test {
         rat.grantRole(rat.MINTER_ROLE(), address(treasury));
 
         rat.transfer(alice, 2_000_000e18);
-        rat.transfer(bob,   500_000e18);
+        rat.transfer(bob, 500_000e18);
         rat.transfer(carol, 500_000e18);
 
-        vm.prank(alice);  rat.delegate(alice);
-        vm.prank(bob);    rat.delegate(bob);
-        vm.prank(carol);  rat.delegate(carol);
+        vm.prank(alice);
+        rat.delegate(alice);
+        vm.prank(bob);
+        rat.delegate(bob);
+        vm.prank(carol);
+        rat.delegate(carol);
         rat.delegate(deployer);
 
         vm.roll(block.number + 2);
     }
 
-    function _proposal() internal view returns (
-        address[] memory targets,
-        uint256[] memory values,
-        bytes[] memory calldatas,
-        string memory desc
-    ) {
-        targets   = new address[](1);
-        values    = new uint256[](1);
+    function _proposal()
+        internal
+        view
+        returns (
+            address[] memory targets,
+            uint256[] memory values,
+            bytes[] memory calldatas,
+            string memory desc
+        )
+    {
+        targets = new address[](1);
+        values = new uint256[](1);
         calldatas = new bytes[](1);
-        targets[0]   = address(maze);
-        calldatas[0] = abi.encodeCall(RatMaze.setZoneParams, (2, 65, 4 minutes, 200));
+        targets[0] = address(maze);
+        calldatas[0] = abi.encodeCall(
+            RatMaze.setZoneParams,
+            (2, 65, 4 minutes, 200)
+        );
         desc = "Proposal #1: tune zone 2";
     }
 
@@ -82,7 +98,7 @@ contract GameGovernorTest is Test {
         vm.roll(block.number + 1);
         uint256 q = governor.quorum(block.number - 1);
         uint256 supply = rat.getPastTotalSupply(block.number - 1);
-        assertEq(q, supply * 4 / 100);
+        assertEq(q, (supply * 4) / 100);
     }
 
     function test_ProposalThreshold_Is1Pct() public {
@@ -97,50 +113,86 @@ contract GameGovernorTest is Test {
     }
 
     function test_Propose_Success() public {
-        (address[] memory t, uint256[] memory v, bytes[] memory c, string memory d) = _proposal();
+        (
+            address[] memory t,
+            uint256[] memory v,
+            bytes[] memory c,
+            string memory d
+        ) = _proposal();
         vm.prank(alice);
         uint256 id = governor.propose(t, v, c, d);
         assertGt(id, 0);
     }
 
     function test_Propose_BelowThreshold_Reverts() public {
-        (address[] memory t, uint256[] memory v, bytes[] memory c, string memory d) = _proposal();
-        vm.prank(bob);
+        (
+            address[] memory t,
+            uint256[] memory v,
+            bytes[] memory c,
+            string memory d
+        ) = _proposal();
+        // poorUser has 0 tokens — below 1% threshold
+        vm.prank(poorUser);
         vm.expectRevert();
         governor.propose(t, v, c, d);
     }
 
     function test_FullLifecycle_ProposeVoteQueueExecute() public {
-        (address[] memory t, uint256[] memory v, bytes[] memory c, string memory d) = _proposal();
+        (
+            address[] memory t,
+            uint256[] memory v,
+            bytes[] memory c,
+            string memory d
+        ) = _proposal();
 
         vm.prank(alice);
         uint256 pid = governor.propose(t, v, c, d);
 
         vm.roll(block.number + governor.votingDelay() + 1);
-        assertEq(uint8(governor.state(pid)), uint8(IGovernor.ProposalState.Active));
+        assertEq(
+            uint8(governor.state(pid)),
+            uint8(IGovernor.ProposalState.Active)
+        );
 
-        vm.prank(alice);  governor.castVote(pid, 1);
-        vm.prank(bob);    governor.castVote(pid, 1);
-        vm.prank(carol);  governor.castVote(pid, 1);
+        vm.prank(alice);
+        governor.castVote(pid, 1);
+        vm.prank(bob);
+        governor.castVote(pid, 1);
+        vm.prank(carol);
+        governor.castVote(pid, 1);
         governor.castVote(pid, 1);
 
         vm.roll(block.number + governor.votingPeriod() + 1);
-        assertEq(uint8(governor.state(pid)), uint8(IGovernor.ProposalState.Succeeded));
+        assertEq(
+            uint8(governor.state(pid)),
+            uint8(IGovernor.ProposalState.Succeeded)
+        );
 
         governor.queue(t, v, c, keccak256(bytes(d)));
-        assertEq(uint8(governor.state(pid)), uint8(IGovernor.ProposalState.Queued));
+        assertEq(
+            uint8(governor.state(pid)),
+            uint8(IGovernor.ProposalState.Queued)
+        );
 
         vm.warp(block.timestamp + 2 days + 1);
         governor.execute(t, v, c, keccak256(bytes(d)));
-        assertEq(uint8(governor.state(pid)), uint8(IGovernor.ProposalState.Executed));
+        assertEq(
+            uint8(governor.state(pid)),
+            uint8(IGovernor.ProposalState.Executed)
+        );
 
         assertEq(maze.survivalChances(2), 65);
-        assertEq(maze.runDurations(2),   4 minutes);
-        assertEq(maze.scrapRewards(2),   200);
+        assertEq(maze.runDurations(2), 4 minutes);
+        assertEq(maze.scrapRewards(2), 200);
     }
 
     function test_Proposal_Defeated_NoQuorum() public {
-        (address[] memory t, uint256[] memory v, bytes[] memory c, string memory d) = _proposal();
+        (
+            address[] memory t,
+            uint256[] memory v,
+            bytes[] memory c,
+            string memory d
+        ) = _proposal();
         vm.prank(alice);
         uint256 pid = governor.propose(t, v, c, d);
 
@@ -149,18 +201,29 @@ contract GameGovernorTest is Test {
         governor.castVote(pid, 0);
 
         vm.roll(block.number + governor.votingPeriod() + 1);
-        assertEq(uint8(governor.state(pid)), uint8(IGovernor.ProposalState.Defeated));
+        assertEq(
+            uint8(governor.state(pid)),
+            uint8(IGovernor.ProposalState.Defeated)
+        );
     }
 
     function test_TimelockDelay_Enforced() public {
-        (address[] memory t, uint256[] memory v, bytes[] memory c, string memory d) = _proposal();
+        (
+            address[] memory t,
+            uint256[] memory v,
+            bytes[] memory c,
+            string memory d
+        ) = _proposal();
 
         vm.prank(alice);
         uint256 pid = governor.propose(t, v, c, d);
         vm.roll(block.number + governor.votingDelay() + 1);
-        vm.prank(alice); governor.castVote(pid, 1);
-        vm.prank(bob);   governor.castVote(pid, 1);
-        vm.prank(carol); governor.castVote(pid, 1);
+        vm.prank(alice);
+        governor.castVote(pid, 1);
+        vm.prank(bob);
+        governor.castVote(pid, 1);
+        vm.prank(carol);
+        governor.castVote(pid, 1);
         governor.castVote(pid, 1);
         vm.roll(block.number + governor.votingPeriod() + 1);
         governor.queue(t, v, c, keccak256(bytes(d)));
@@ -170,24 +233,34 @@ contract GameGovernorTest is Test {
     }
 
     function test_CastVote_Against() public {
-        (address[] memory t, uint256[] memory v, bytes[] memory c, string memory d) = _proposal();
+        (
+            address[] memory t,
+            uint256[] memory v,
+            bytes[] memory c,
+            string memory d
+        ) = _proposal();
         vm.prank(alice);
         uint256 pid = governor.propose(t, v, c, d);
         vm.roll(block.number + governor.votingDelay() + 1);
         vm.prank(alice);
         governor.castVote(pid, 0);
-        (uint256 against,,) = governor.proposalVotes(pid);
+        (uint256 against, , ) = governor.proposalVotes(pid);
         assertGt(against, 0);
     }
 
     function test_CastVote_Abstain() public {
-        (address[] memory t, uint256[] memory v, bytes[] memory c, string memory d) = _proposal();
+        (
+            address[] memory t,
+            uint256[] memory v,
+            bytes[] memory c,
+            string memory d
+        ) = _proposal();
         vm.prank(alice);
         uint256 pid = governor.propose(t, v, c, d);
         vm.roll(block.number + governor.votingDelay() + 1);
         vm.prank(alice);
         governor.castVote(pid, 2);
-        (,, uint256 abstain) = governor.proposalVotes(pid);
+        (, , uint256 abstain) = governor.proposalVotes(pid);
         assertGt(abstain, 0);
     }
 }

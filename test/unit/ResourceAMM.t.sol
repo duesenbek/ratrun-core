@@ -6,33 +6,38 @@ import "../../contracts/market/ResourceAMM.sol";
 import "../../contracts/market/LPToken.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
-/// @dev Minimal ERC20 token for test setup.
 contract MockERC20 is ERC20 {
     constructor(string memory name, string memory symbol) ERC20(name, symbol) {}
-    function mint(address to, uint256 amount) external { _mint(to, amount); }
+    function mint(address to, uint256 amount) external {
+        _mint(to, amount);
+    }
 }
 
-/// @title ResourceAMM_UnitTest
-/// @notice Unit tests for ResourceAMM (The Night Market).
-/// @dev    Tests cover: liquidity add/remove, swaps, fees, slippage, k invariant.
 contract ResourceAMM_UnitTest is Test {
-    // ─────────────────────────────────────────────
-    // SETUP
-    // ─────────────────────────────────────────────
-
-    MockERC20   internal scrap;
-    MockERC20   internal battery;
+    MockERC20 internal scrap;
+    MockERC20 internal battery;
+    MockERC20 internal token0; // sorted
+    MockERC20 internal token1; // sorted
     ResourceAMM internal amm;
-    address     internal treasury = makeAddr("treasury");
-    address     internal alice    = makeAddr("alice");
-    address     internal bob      = makeAddr("bob");
+    address internal treasury = makeAddr("treasury");
+    address internal alice = makeAddr("alice");
+    address internal bob = makeAddr("bob");
 
-    uint256 internal constant INITIAL_SCRAP   = 1_000_000e18;
-    uint256 internal constant INITIAL_BATTERY = 500_000e18;
+    uint256 internal constant INITIAL_0 = 1_000_000e18;
+    uint256 internal constant INITIAL_1 = 500_000e18;
 
     function setUp() public {
-        scrap   = new MockERC20("Scrap",   "SCRAP");
+        scrap = new MockERC20("Scrap", "SCRAP");
         battery = new MockERC20("Battery", "BATTERY");
+
+        // Determine sort order
+        if (address(scrap) < address(battery)) {
+            token0 = scrap;
+            token1 = battery;
+        } else {
+            token0 = battery;
+            token1 = scrap;
+        }
 
         amm = new ResourceAMM(
             IERC20(address(scrap)),
@@ -42,27 +47,26 @@ contract ResourceAMM_UnitTest is Test {
             treasury
         );
 
-        // Fund alice
-        scrap.mint(alice, 10_000_000e18);
-        battery.mint(alice, 10_000_000e18);
+        token0.mint(alice, 10_000_000e18);
+        token1.mint(alice, 10_000_000e18);
+        token0.mint(bob, 1_000_000e18);
+        token1.mint(bob, 1_000_000e18);
 
-        // Fund bob
-        scrap.mint(bob, 1_000_000e18);
-        battery.mint(bob, 1_000_000e18);
+        vm.prank(alice);
+        token0.approve(address(amm), type(uint256).max);
+        vm.prank(alice);
+        token1.approve(address(amm), type(uint256).max);
+        vm.prank(bob);
+        token0.approve(address(amm), type(uint256).max);
+        vm.prank(bob);
+        token1.approve(address(amm), type(uint256).max);
     }
-
-    // ─────────────────────────────────────────────
-    // ADD LIQUIDITY
-    // ─────────────────────────────────────────────
 
     function test_AddLiquidity_FirstDeposit() public {
         vm.startPrank(alice);
-        scrap.approve(address(amm), INITIAL_SCRAP);
-        battery.approve(address(amm), INITIAL_BATTERY);
-
         (uint256 a0, uint256 a1, uint256 shares) = amm.addLiquidity(
-            INITIAL_SCRAP,
-            INITIAL_BATTERY,
+            INITIAL_0,
+            INITIAL_1,
             0,
             0,
             alice,
@@ -70,29 +74,22 @@ contract ResourceAMM_UnitTest is Test {
         );
         vm.stopPrank();
 
-        assertEq(a0, INITIAL_SCRAP,   "amount0 mismatch");
-        assertEq(a1, INITIAL_BATTERY, "amount1 mismatch");
+        assertEq(a0, INITIAL_0, "amount0 mismatch");
+        assertEq(a1, INITIAL_1, "amount1 mismatch");
         assertGt(shares, 0, "zero shares minted");
 
         (uint256 r0, uint256 r1) = amm.getReserves();
-        assertEq(r0, INITIAL_SCRAP,   "reserve0 mismatch");
-        assertEq(r1, INITIAL_BATTERY, "reserve1 mismatch");
+        assertEq(r0, INITIAL_0, "reserve0 mismatch");
+        assertEq(r1, INITIAL_1, "reserve1 mismatch");
     }
 
     function test_AddLiquidity_SubsequentDeposit_MaintainsRatio() public {
-        _bootstrapLiquidity(alice, INITIAL_SCRAP, INITIAL_BATTERY);
-
-        // Bob adds proportional liquidity
-        uint256 bobScrap   = 100_000e18;
-        uint256 bobBattery = 500_000e18; // ratio is 2:1 scrap:battery, so optimal is 50_000e18 battery
+        _bootstrapLiquidity(alice, INITIAL_0, INITIAL_1);
 
         vm.startPrank(bob);
-        scrap.approve(address(amm), bobScrap);
-        battery.approve(address(amm), bobBattery);
-
         (, uint256 a1, ) = amm.addLiquidity(
-            bobScrap,
-            bobBattery,
+            100_000e18,
+            500_000e18,
             0,
             0,
             bob,
@@ -100,39 +97,31 @@ contract ResourceAMM_UnitTest is Test {
         );
         vm.stopPrank();
 
-        // Should have used proportional battery amount (50_000e18), not the full 500_000e18
-        assertLe(a1, 50_001e18, "used more battery than ratio requires");
+        assertLe(a1, 50_001e18, "used more token1 than ratio requires");
     }
 
     function test_AddLiquidity_RevertOn_DeadlineExpired() public {
         vm.startPrank(alice);
-        scrap.approve(address(amm), INITIAL_SCRAP);
-        battery.approve(address(amm), INITIAL_BATTERY);
-
         vm.expectRevert(ResourceAMM.AMM__DeadlineExpired.selector);
         amm.addLiquidity(
-            INITIAL_SCRAP,
-            INITIAL_BATTERY,
+            INITIAL_0,
+            INITIAL_1,
             0,
             0,
             alice,
-            block.timestamp - 1 // expired
+            block.timestamp - 1
         );
         vm.stopPrank();
     }
 
-    // ─────────────────────────────────────────────
-    // REMOVE LIQUIDITY
-    // ─────────────────────────────────────────────
-
     function test_RemoveLiquidity_FullWithdraw() public {
-        _bootstrapLiquidity(alice, INITIAL_SCRAP, INITIAL_BATTERY);
+        _bootstrapLiquidity(alice, INITIAL_0, INITIAL_1);
 
         LPToken lp = amm.lpToken();
         uint256 shares = lp.balanceOf(alice);
 
-        uint256 scrapBefore   = scrap.balanceOf(alice);
-        uint256 batteryBefore = battery.balanceOf(alice);
+        uint256 bal0Before = token0.balanceOf(alice);
+        uint256 bal1Before = token1.balanceOf(alice);
 
         vm.startPrank(alice);
         lp.approve(address(amm), shares);
@@ -145,14 +134,22 @@ contract ResourceAMM_UnitTest is Test {
         );
         vm.stopPrank();
 
-        assertGt(a0, 0, "zero scrap returned");
-        assertGt(a1, 0, "zero battery returned");
-        assertEq(scrap.balanceOf(alice),   scrapBefore   + a0, "scrap balance mismatch");
-        assertEq(battery.balanceOf(alice), batteryBefore + a1, "battery balance mismatch");
+        assertGt(a0, 0, "zero token0 returned");
+        assertGt(a1, 0, "zero token1 returned");
+        assertEq(
+            token0.balanceOf(alice),
+            bal0Before + a0,
+            "token0 balance mismatch"
+        );
+        assertEq(
+            token1.balanceOf(alice),
+            bal1Before + a1,
+            "token1 balance mismatch"
+        );
     }
 
     function test_RemoveLiquidity_RevertOn_Slippage() public {
-        _bootstrapLiquidity(alice, INITIAL_SCRAP, INITIAL_BATTERY);
+        _bootstrapLiquidity(alice, INITIAL_0, INITIAL_1);
 
         LPToken lp = amm.lpToken();
         uint256 shares = lp.balanceOf(alice);
@@ -162,7 +159,7 @@ contract ResourceAMM_UnitTest is Test {
         vm.expectRevert(ResourceAMM.AMM__SlippageExceeded.selector);
         amm.removeLiquidity(
             shares,
-            type(uint256).max, // impossible min
+            type(uint256).max,
             0,
             alice,
             block.timestamp + 1
@@ -170,20 +167,14 @@ contract ResourceAMM_UnitTest is Test {
         vm.stopPrank();
     }
 
-    // ─────────────────────────────────────────────
-    // SWAP
-    // ─────────────────────────────────────────────
-
     function test_Swap_ZeroForOne_OutputCalculation() public {
-        _bootstrapLiquidity(alice, INITIAL_SCRAP, INITIAL_BATTERY);
+        _bootstrapLiquidity(alice, INITIAL_0, INITIAL_1);
 
-        uint256 swapIn  = 1_000e18;
+        uint256 swapIn = 1_000e18;
         uint256 preview = amm.getAmountOut(swapIn, true);
-
-        uint256 balBefore = battery.balanceOf(bob);
+        uint256 bal1Before = token1.balanceOf(bob);
 
         vm.startPrank(bob);
-        scrap.approve(address(amm), swapIn);
         uint256 out = amm.swapExactInput(
             swapIn,
             preview,
@@ -194,17 +185,20 @@ contract ResourceAMM_UnitTest is Test {
         vm.stopPrank();
 
         assertEq(out, preview, "swap output mismatch");
-        assertEq(battery.balanceOf(bob), balBefore + out, "battery not received");
+        assertEq(
+            token1.balanceOf(bob),
+            bal1Before + out,
+            "token1 not received"
+        );
     }
 
     function test_Swap_OneForZero() public {
-        _bootstrapLiquidity(alice, INITIAL_SCRAP, INITIAL_BATTERY);
+        _bootstrapLiquidity(alice, INITIAL_0, INITIAL_1);
 
-        uint256 swapIn  = 500e18;
+        uint256 swapIn = 500e18;
         uint256 preview = amm.getAmountOut(swapIn, false);
 
         vm.startPrank(bob);
-        battery.approve(address(amm), swapIn);
         uint256 out = amm.swapExactInput(
             swapIn,
             preview,
@@ -218,14 +212,13 @@ contract ResourceAMM_UnitTest is Test {
     }
 
     function test_Swap_RevertOn_SlippageTooHigh() public {
-        _bootstrapLiquidity(alice, INITIAL_SCRAP, INITIAL_BATTERY);
+        _bootstrapLiquidity(alice, INITIAL_0, INITIAL_1);
 
         vm.startPrank(bob);
-        scrap.approve(address(amm), 1_000e18);
         vm.expectRevert(ResourceAMM.AMM__SlippageExceeded.selector);
         amm.swapExactInput(
             1_000e18,
-            type(uint256).max, // impossible min out
+            type(uint256).max,
             true,
             bob,
             block.timestamp + 1
@@ -233,37 +226,24 @@ contract ResourceAMM_UnitTest is Test {
         vm.stopPrank();
     }
 
-    // ─────────────────────────────────────────────
-    // K INVARIANT
-    // ─────────────────────────────────────────────
-
     function test_K_Invariant_AfterSwap() public {
-        _bootstrapLiquidity(alice, INITIAL_SCRAP, INITIAL_BATTERY);
+        _bootstrapLiquidity(alice, INITIAL_0, INITIAL_1);
 
         (uint256 r0Before, uint256 r1Before) = amm.getReserves();
         uint256 kBefore = r0Before * r1Before;
 
         vm.startPrank(bob);
-        scrap.approve(address(amm), 10_000e18);
         amm.swapExactInput(10_000e18, 0, true, bob, block.timestamp + 1);
         vm.stopPrank();
 
         (uint256 r0After, uint256 r1After) = amm.getReserves();
-        uint256 kAfter = r0After * r1After;
-
-        // k_after >= k_before (fees increase k)
-        assertGe(kAfter, kBefore, "k invariant violated");
+        assertGe(r0After * r1After, kBefore, "k invariant violated");
     }
 
-    // ─────────────────────────────────────────────
-    // TREASURY FEES
-    // ─────────────────────────────────────────────
-
     function test_TreasuryFees_Accumulate() public {
-        _bootstrapLiquidity(alice, INITIAL_SCRAP, INITIAL_BATTERY);
+        _bootstrapLiquidity(alice, INITIAL_0, INITIAL_1);
 
         vm.startPrank(bob);
-        scrap.approve(address(amm), 100_000e18);
         amm.swapExactInput(100_000e18, 0, true, bob, block.timestamp + 1);
         vm.stopPrank();
 
@@ -271,10 +251,9 @@ contract ResourceAMM_UnitTest is Test {
     }
 
     function test_CollectTreasuryFees() public {
-        _bootstrapLiquidity(alice, INITIAL_SCRAP, INITIAL_BATTERY);
+        _bootstrapLiquidity(alice, INITIAL_0, INITIAL_1);
 
         vm.startPrank(bob);
-        scrap.approve(address(amm), 100_000e18);
         amm.swapExactInput(100_000e18, 0, true, bob, block.timestamp + 1);
         vm.stopPrank();
 
@@ -284,12 +263,12 @@ contract ResourceAMM_UnitTest is Test {
         amm.collectTreasuryFees();
 
         assertEq(amm.treasuryFees0(), 0, "fees not zeroed");
-        assertEq(scrap.balanceOf(treasury), fee0, "treasury did not receive fees");
+        assertEq(
+            token0.balanceOf(treasury),
+            fee0,
+            "treasury did not receive fees"
+        );
     }
-
-    // ─────────────────────────────────────────────
-    // HELPERS
-    // ─────────────────────────────────────────────
 
     function _bootstrapLiquidity(
         address provider,
@@ -297,8 +276,6 @@ contract ResourceAMM_UnitTest is Test {
         uint256 amount1
     ) internal {
         vm.startPrank(provider);
-        scrap.approve(address(amm), amount0);
-        battery.approve(address(amm), amount1);
         amm.addLiquidity(amount0, amount1, 0, 0, provider, block.timestamp + 1);
         vm.stopPrank();
     }

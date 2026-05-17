@@ -5,23 +5,20 @@ import "forge-std/Test.sol";
 import "../../contracts/market/ResourceAMM.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
-/// @dev Minimal ERC20 for fuzz setup.
 contract FuzzMockERC20 is ERC20 {
     constructor(string memory name, string memory symbol) ERC20(name, symbol) {}
-    function mint(address to, uint256 amount) external { _mint(to, amount); }
+    function mint(address to, uint256 amount) external {
+        _mint(to, amount);
+    }
 }
 
-/// @title ResourceAMM_FuzzTest
-/// @notice Fuzz tests for ResourceAMM — random swap/liquidity amounts.
-/// @dev    Uses Foundry's built-in fuzzer. Each test runs 256 times by default.
-///         Invariant checked: k_after >= k_before after every swap.
 contract ResourceAMM_FuzzTest is Test {
     FuzzMockERC20 internal tokenA;
     FuzzMockERC20 internal tokenB;
-    ResourceAMM   internal amm;
-    address        internal treasury = makeAddr("treasury");
-    address        internal lp       = makeAddr("lp");
-    address        internal swapper  = makeAddr("swapper");
+    ResourceAMM internal amm;
+    address internal treasury = makeAddr("treasury");
+    address internal lp = makeAddr("lp");
+    address internal swapper = makeAddr("swapper");
 
     function setUp() public {
         tokenA = new FuzzMockERC20("TokenA", "TKA");
@@ -35,27 +32,27 @@ contract ResourceAMM_FuzzTest is Test {
             treasury
         );
 
-        // Seed LP with large balances
-        tokenA.mint(lp,      type(uint128).max);
-        tokenB.mint(lp,      type(uint128).max);
+        tokenA.mint(lp, type(uint128).max);
+        tokenB.mint(lp, type(uint128).max);
         tokenA.mint(swapper, type(uint128).max);
         tokenB.mint(swapper, type(uint128).max);
+
+        // Pre-approve max
+        vm.prank(lp);
+        tokenA.approve(address(amm), type(uint256).max);
+        vm.prank(lp);
+        tokenB.approve(address(amm), type(uint256).max);
+        vm.prank(swapper);
+        tokenA.approve(address(amm), type(uint256).max);
+        vm.prank(swapper);
+        tokenB.approve(address(amm), type(uint256).max);
     }
 
-    // ─────────────────────────────────────────────
-    // FUZZ: Random liquidity amounts
-    // ─────────────────────────────────────────────
-
-    /// @notice Fuzz addLiquidity with random amounts — LP shares always > 0 when valid.
     function testFuzz_AddLiquidity(uint96 amount0, uint96 amount1) public {
-        // Bound to avoid zero and overflow
         amount0 = uint96(bound(amount0, 1e9, uint256(type(uint96).max)));
         amount1 = uint96(bound(amount1, 1e9, uint256(type(uint96).max)));
 
         vm.startPrank(lp);
-        tokenA.approve(address(amm), amount0);
-        tokenB.approve(address(amm), amount1);
-
         (uint256 a0, uint256 a1, uint256 shares) = amm.addLiquidity(
             amount0,
             amount1,
@@ -66,64 +63,68 @@ contract ResourceAMM_FuzzTest is Test {
         );
         vm.stopPrank();
 
-        assertGt(shares, 0,  "fuzz: zero shares");
-        assertGe(a0, 0,      "fuzz: negative amount0");
-        assertGe(a1, 0,      "fuzz: negative amount1");
+        assertGt(shares, 0, "fuzz: zero shares");
+        assertGe(a0, 0, "fuzz: negative amount0");
+        assertGe(a1, 0, "fuzz: negative amount1");
     }
 
-    // ─────────────────────────────────────────────
-    // FUZZ: Random swap amounts — k invariant holds
-    // ─────────────────────────────────────────────
+    function testFuzz_Swap_KInvariant(
+        uint96 seedAmount0,
+        uint96 seedAmount1,
+        uint64 swapIn
+    ) public {
+        seedAmount0 = uint96(
+            bound(seedAmount0, 1e12, uint256(type(uint96).max))
+        );
+        seedAmount1 = uint96(
+            bound(seedAmount1, 1e12, uint256(type(uint96).max))
+        );
+        swapIn = uint64(bound(swapIn, 1e6, uint256(type(uint64).max)));
 
-    /// @notice Fuzz swap amounts — k must not decrease after any swap.
-    function testFuzz_Swap_KInvariant(uint96 seedAmount0, uint96 seedAmount1, uint64 swapIn) public {
-        seedAmount0 = uint96(bound(seedAmount0, 1e12, uint256(type(uint96).max)));
-        seedAmount1 = uint96(bound(seedAmount1, 1e12, uint256(type(uint96).max)));
-        swapIn      = uint64(bound(swapIn, 1e6, uint256(type(uint64).max)));
-
-        // Bootstrap pool
         vm.startPrank(lp);
-        tokenA.approve(address(amm), seedAmount0);
-        tokenB.approve(address(amm), seedAmount1);
-        amm.addLiquidity(seedAmount0, seedAmount1, 0, 0, lp, block.timestamp + 1);
+        amm.addLiquidity(
+            seedAmount0,
+            seedAmount1,
+            0,
+            0,
+            lp,
+            block.timestamp + 1
+        );
         vm.stopPrank();
 
-        // Snapshot k before
         (uint256 r0Before, uint256 r1Before) = amm.getReserves();
         uint256 kBefore = r0Before * r1Before;
 
-        // Swap
         vm.startPrank(swapper);
-        tokenA.approve(address(amm), swapIn);
         try amm.swapExactInput(swapIn, 0, true, swapper, block.timestamp + 1) {
-            // If swap succeeded, check k
             (uint256 r0After, uint256 r1After) = amm.getReserves();
-            uint256 kAfter = r0After * r1After;
-            assertGe(kAfter, kBefore, "INVARIANT VIOLATED: k decreased after swap");
-        } catch {
-            // Swap may revert for valid reasons (e.g., insufficient reserves); that's fine
-        }
+            assertGe(
+                r0After * r1After,
+                kBefore,
+                "INVARIANT VIOLATED: k decreased after swap"
+            );
+        } catch {}
         vm.stopPrank();
     }
 
-    // ─────────────────────────────────────────────
-    // FUZZ: Random liquidity removals — proportional amounts
-    // ─────────────────────────────────────────────
-
-    /// @notice Fuzz removeLiquidity — withdrawn amounts always proportional.
     function testFuzz_RemoveLiquidity_Proportional(
         uint96 amount0,
         uint96 amount1,
-        uint8  sharePercent
+        uint8 sharePercent
     ) public {
-        amount0      = uint96(bound(amount0, 1e12, uint256(type(uint96).max)));
-        amount1      = uint96(bound(amount1, 1e12, uint256(type(uint96).max)));
-        sharePercent = uint8(bound(sharePercent, 1, 99)); // 1–99% of shares
+        amount0 = uint96(bound(amount0, 1e12, uint256(type(uint96).max)));
+        amount1 = uint96(bound(amount1, 1e12, uint256(type(uint96).max)));
+        sharePercent = uint8(bound(sharePercent, 1, 99));
 
         vm.startPrank(lp);
-        tokenA.approve(address(amm), amount0);
-        tokenB.approve(address(amm), amount1);
-        (,, uint256 totalShares) = amm.addLiquidity(amount0, amount1, 0, 0, lp, block.timestamp + 1);
+        (, , uint256 totalShares) = amm.addLiquidity(
+            amount0,
+            amount1,
+            0,
+            0,
+            lp,
+            block.timestamp + 1
+        );
         vm.stopPrank();
 
         uint256 sharesToRemove = (totalShares * sharePercent) / 100;
@@ -146,23 +147,27 @@ contract ResourceAMM_FuzzTest is Test {
         );
         vm.stopPrank();
 
-        // Allow 1 wei rounding tolerance
-        assertApproxEqAbs(outA, expectedA, 1, "fuzz: withdraw amount0 not proportional");
-        assertApproxEqAbs(outB, expectedB, 1, "fuzz: withdraw amount1 not proportional");
+        assertApproxEqAbs(
+            outA,
+            expectedA,
+            1,
+            "fuzz: withdraw amount0 not proportional"
+        );
+        assertApproxEqAbs(
+            outB,
+            expectedB,
+            1,
+            "fuzz: withdraw amount1 not proportional"
+        );
     }
 
-    // ─────────────────────────────────────────────
-    // FUZZ: getAmountOut never exceeds reserves
-    // ─────────────────────────────────────────────
-
-    /// @notice Fuzz quote functions — output must never exceed pool reserves.
     function testFuzz_GetAmountOut_NeverExceedsReserves(
         uint96 r0,
         uint96 r1,
         uint64 amountIn
     ) public view {
-        r0       = uint96(bound(r0, 1e6, uint256(type(uint96).max)));
-        r1       = uint96(bound(r1, 1e6, uint256(type(uint96).max)));
+        r0 = uint96(bound(r0, 1e6, uint256(type(uint96).max)));
+        r1 = uint96(bound(r1, 1e6, uint256(type(uint96).max)));
         amountIn = uint64(bound(amountIn, 1, uint256(type(uint64).max)));
 
         uint256 out = AMMLib.getAmountOut(amountIn, r0, r1);

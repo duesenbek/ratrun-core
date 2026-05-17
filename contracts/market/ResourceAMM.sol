@@ -30,7 +30,7 @@ import "./LPToken.sol";
 ///         - TREASURY_FEE_BPS:      1 bps out of every 30 bps fee goes to treasury.
 contract ResourceAMM is IResourceAMM, ReentrancyGuard, Ownable {
     using SafeERC20 for IERC20;
-    using AMMLib   for uint256;
+    using AMMLib for uint256;
 
     // ─────────────────────────────────────────────
     // CUSTOM ERRORS
@@ -50,9 +50,9 @@ contract ResourceAMM is IResourceAMM, ReentrancyGuard, Ownable {
     // ─────────────────────────────────────────────
 
     /// @dev 5 bps of the 30 bps total fee routes to the treasury.
-    uint256 public constant TREASURY_FEE_BPS  = 5;
-    uint256 public constant TOTAL_FEE_BPS     = 30;
-    uint256 public constant FEE_DENOMINATOR   = 10_000;
+    uint256 public constant TREASURY_FEE_BPS = 5;
+    uint256 public constant TOTAL_FEE_BPS = 30;
+    uint256 public constant FEE_DENOMINATOR = 10_000;
     uint256 public constant MINIMUM_LIQUIDITY = AMMLib.MINIMUM_LIQUIDITY;
 
     // ─────────────────────────────────────────────
@@ -60,8 +60,8 @@ contract ResourceAMM is IResourceAMM, ReentrancyGuard, Ownable {
     // ─────────────────────────────────────────────
 
     /// @notice The two ERC20 tokens forming this pool (token0 < token1 by address).
-    IERC20  public immutable token0;
-    IERC20  public immutable token1;
+    IERC20 public immutable token0;
+    IERC20 public immutable token1;
 
     /// @notice LP share token for this pool.
     LPToken public immutable lpToken;
@@ -104,15 +104,17 @@ contract ResourceAMM is IResourceAMM, ReentrancyGuard, Ownable {
     /// @param lpSymbol_  LP token symbol.
     /// @param treasury_  Initial treasury address.
     constructor(
-        IERC20  tokenA_,
-        IERC20  tokenB_,
+        IERC20 tokenA_,
+        IERC20 tokenB_,
         string memory lpName_,
         string memory lpSymbol_,
         address treasury_
     ) Ownable(msg.sender) {
-        if (address(tokenA_)  == address(0) ||
-            address(tokenB_)  == address(0) ||
-            address(tokenA_)  == address(tokenB_)) revert AMM__InvalidTokens();
+        if (
+            address(tokenA_) == address(0) ||
+            address(tokenB_) == address(0) ||
+            address(tokenA_) == address(tokenB_)
+        ) revert AMM__InvalidTokens();
         if (treasury_ == address(0)) revert AMM__ZeroAddress();
 
         // Canonical ordering — lower address becomes token0
@@ -123,7 +125,7 @@ contract ResourceAMM is IResourceAMM, ReentrancyGuard, Ownable {
         treasury = treasury_;
 
         // Deploy LP token, grant AMM_ROLE to this contract
-        lpToken  = new LPToken(lpName_, lpSymbol_, msg.sender);
+        lpToken = new LPToken(lpName_, lpSymbol_, address(this));
         lpToken.grantRole(lpToken.AMM_ROLE(), address(this));
     }
 
@@ -147,7 +149,8 @@ contract ResourceAMM is IResourceAMM, ReentrancyGuard, Ownable {
         beforeDeadline(deadline)
         returns (uint256 amount0, uint256 amount1, uint256 shares)
     {
-        if (amount0Desired == 0 || amount1Desired == 0) revert AMM__ZeroAmount();
+        if (amount0Desired == 0 || amount1Desired == 0)
+            revert AMM__ZeroAmount();
         if (to == address(0)) revert AMM__ZeroAddress();
 
         uint256 _reserve0 = reserve0;
@@ -161,13 +164,21 @@ contract ResourceAMM is IResourceAMM, ReentrancyGuard, Ownable {
             amount1 = amount1Desired;
         } else {
             // Subsequent deposits — maintain current ratio
-            uint256 amount1Optimal = AMMLib.quote(amount0Desired, _reserve0, _reserve1);
+            uint256 amount1Optimal = AMMLib.quote(
+                amount0Desired,
+                _reserve0,
+                _reserve1
+            );
             if (amount1Optimal <= amount1Desired) {
                 if (amount1Optimal < amount1Min) revert AMM__SlippageExceeded();
                 amount0 = amount0Desired;
                 amount1 = amount1Optimal;
             } else {
-                uint256 amount0Optimal = AMMLib.quote(amount1Desired, _reserve1, _reserve0);
+                uint256 amount0Optimal = AMMLib.quote(
+                    amount1Desired,
+                    _reserve1,
+                    _reserve0
+                );
                 if (amount0Optimal < amount0Min) revert AMM__SlippageExceeded();
                 amount0 = amount0Optimal;
                 amount1 = amount1Desired;
@@ -180,16 +191,19 @@ contract ResourceAMM is IResourceAMM, ReentrancyGuard, Ownable {
             // Mint MINIMUM_LIQUIDITY to address(0) — permanently locked
             lpToken.mint(address(0xdead), MINIMUM_LIQUIDITY);
         } else {
-            shares = AMMLib.subsequentShares(amount0, amount1, _reserve0, _reserve1, totalSupply);
+            shares = AMMLib.subsequentShares(
+                amount0,
+                amount1,
+                _reserve0,
+                _reserve1,
+                totalSupply
+            );
         }
 
         if (shares == 0) revert AMM__InsufficientLiquidity();
 
         // ── Effects: update reserves ──────────────
-        _updateReserves(
-            _reserve0 + amount0,
-            _reserve1 + amount1
-        );
+        _updateReserves(_reserve0 + amount0, _reserve1 + amount1);
 
         // ── Interactions: pull tokens + mint LP ───
         token0.safeTransferFrom(msg.sender, address(this), amount0);
@@ -221,15 +235,16 @@ contract ResourceAMM is IResourceAMM, ReentrancyGuard, Ownable {
         if (to == address(0)) revert AMM__ZeroAddress();
 
         uint256 totalSupply = lpToken.totalSupply();
-        uint256 _reserve0   = reserve0;
-        uint256 _reserve1   = reserve1;
+        uint256 _reserve0 = reserve0;
+        uint256 _reserve1 = reserve1;
 
         // Proportional withdrawal
         amount0 = (shares * _reserve0) / totalSupply;
         amount1 = (shares * _reserve1) / totalSupply;
 
-        if (amount0 < amount0Min || amount1 < amount1Min) revert AMM__SlippageExceeded();
-        if (amount0 == 0 || amount1 == 0)                 revert AMM__InsufficientLiquidity();
+        if (amount0 < amount0Min || amount1 < amount1Min)
+            revert AMM__SlippageExceeded();
+        if (amount0 == 0 || amount1 == 0) revert AMM__InsufficientLiquidity();
 
         // ── Effects ───────────────────────────────
         _updateReserves(_reserve0 - amount0, _reserve1 - amount1);
@@ -252,7 +267,7 @@ contract ResourceAMM is IResourceAMM, ReentrancyGuard, Ownable {
     function swapExactInput(
         uint256 amountIn,
         uint256 amountOutMin,
-        bool    zeroForOne,
+        bool zeroForOne,
         address to,
         uint256 deadline
     )
@@ -298,7 +313,7 @@ contract ResourceAMM is IResourceAMM, ReentrancyGuard, Ownable {
         }
 
         // ── Interactions ──────────────────────────
-        IERC20 tokenIn  = zeroForOne ? token0 : token1;
+        IERC20 tokenIn = zeroForOne ? token0 : token1;
         IERC20 tokenOut = zeroForOne ? token1 : token0;
 
         tokenIn.safeTransferFrom(msg.sender, address(this), amountIn);
@@ -340,33 +355,44 @@ contract ResourceAMM is IResourceAMM, ReentrancyGuard, Ownable {
     // ─────────────────────────────────────────────
 
     /// @inheritdoc IResourceAMM
-    function getReserves() external view override returns (uint256 r0, uint256 r1) {
+    function getReserves()
+        external
+        view
+        override
+        returns (uint256 r0, uint256 r1)
+    {
         r0 = reserve0;
         r1 = reserve1;
     }
 
     /// @inheritdoc IResourceAMM
-    function getAmountOut(uint256 amountIn, bool zeroForOne)
-        external view override returns (uint256)
-    {
-        return zeroForOne
-            ? AMMLib.getAmountOut(amountIn, reserve0, reserve1)
-            : AMMLib.getAmountOut(amountIn, reserve1, reserve0);
+    function getAmountOut(
+        uint256 amountIn,
+        bool zeroForOne
+    ) external view override returns (uint256) {
+        return
+            zeroForOne
+                ? AMMLib.getAmountOut(amountIn, reserve0, reserve1)
+                : AMMLib.getAmountOut(amountIn, reserve1, reserve0);
     }
 
     /// @inheritdoc IResourceAMM
-    function getAmountIn(uint256 amountOut, bool zeroForOne)
-        external view override returns (uint256)
-    {
-        return zeroForOne
-            ? AMMLib.getAmountIn(amountOut, reserve0, reserve1)
-            : AMMLib.getAmountIn(amountOut, reserve1, reserve0);
+    function getAmountIn(
+        uint256 amountOut,
+        bool zeroForOne
+    ) external view override returns (uint256) {
+        return
+            zeroForOne
+                ? AMMLib.getAmountIn(amountOut, reserve0, reserve1)
+                : AMMLib.getAmountIn(amountOut, reserve1, reserve0);
     }
 
     /// @inheritdoc IResourceAMM
-    function quote(uint256 amount0, uint256 reserveA, uint256 reserveB)
-        external pure override returns (uint256)
-    {
+    function quote(
+        uint256 amount0,
+        uint256 reserveA,
+        uint256 reserveB
+    ) external pure override returns (uint256) {
         return AMMLib.quote(amount0, reserveA, reserveB);
     }
 
@@ -375,7 +401,10 @@ contract ResourceAMM is IResourceAMM, ReentrancyGuard, Ownable {
     // ─────────────────────────────────────────────
 
     /// @dev Update the cached reserves. Both values must fit in uint128.
-    function _updateReserves(uint256 newReserve0, uint256 newReserve1) internal {
+    function _updateReserves(
+        uint256 newReserve0,
+        uint256 newReserve1
+    ) internal {
         reserve0 = uint128(newReserve0);
         reserve1 = uint128(newReserve1);
     }
@@ -383,7 +412,7 @@ contract ResourceAMM is IResourceAMM, ReentrancyGuard, Ownable {
     /// @dev Assert k_after >= k_before. Reverts if the invariant is broken.
     function _checkK(uint256 prevReserve0, uint256 prevReserve1) internal view {
         uint256 kBefore = prevReserve0 * prevReserve1;
-        uint256 kAfter  = uint256(reserve0) * uint256(reserve1);
+        uint256 kAfter = uint256(reserve0) * uint256(reserve1);
         if (kAfter < kBefore) revert AMM__K_Violated();
     }
 }
