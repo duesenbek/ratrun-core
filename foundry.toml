@@ -24,6 +24,9 @@ invariant = { runs = 256, depth = 15 }
 fuzz      = { runs = 256 }
 invariant = { runs = 64, depth = 16 }
 
+[profile.coverage]
+no_match_path = "script/*"
+
 [rpc_endpoints]
 mainnet = "https://ethereum.publicnode.com"
 

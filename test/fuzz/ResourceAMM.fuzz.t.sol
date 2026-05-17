@@ -165,7 +165,7 @@ contract ResourceAMM_FuzzTest is Test {
         uint96 r0,
         uint96 r1,
         uint64 amountIn
-    ) public view {
+    ) public pure {
         r0 = uint96(bound(r0, 1e6, uint256(type(uint96).max)));
         r1 = uint96(bound(r1, 1e6, uint256(type(uint96).max)));
         amountIn = uint64(bound(amountIn, 1, uint256(type(uint64).max)));
