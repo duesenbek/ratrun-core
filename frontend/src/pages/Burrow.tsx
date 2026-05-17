@@ -6,12 +6,19 @@ import { useAccount } from "wagmi";
 
 export default function Burrow() {
   const [amount, setAmount] = useState("");
-  const { shares, assets, deposit, withdraw, isPending } = useBurrow();
+  const { shares, assets, allowance, deposit, withdraw, approve, isPending } = useBurrow();
   const { isConnected } = useAccount();
+
+  const amountBI = amount && !isNaN(Number(amount)) ? BigInt(amount) : 0n;
+  const needsApproval = amountBI > 0n && allowance < amountBI;
 
   const handleDeposit = () => {
     if (!amount || isNaN(Number(amount))) return;
-    deposit(BigInt(amount));
+    if (needsApproval) {
+      approve();
+    } else {
+      deposit(BigInt(amount));
+    }
   };
 
   const handleWithdraw = () => {
@@ -77,7 +84,11 @@ export default function Burrow() {
                 className="pixel-btn flex items-center justify-center gap-2 disabled:opacity-50 group hover:scale-[1.02]"
               >
                 <ArrowDownToLine className="w-5 h-5 group-hover:animate-bounce" />
-                DEPOSIT
+                {isPending ? (
+                  <span className="animate-pulse">{needsApproval ? "APPROVING..." : "DEPOSITING..."}</span>
+                ) : (
+                  needsApproval ? "APPROVE SCRAP" : "DEPOSIT"
+                )}
               </button>
               <button 
                 onClick={handleWithdraw}

@@ -5,15 +5,23 @@ import { useMarket } from "../hooks/useMarket";
 import { useAccount } from "wagmi";
 
 export default function Market() {
-  const { swap, isPending } = useMarket();
+  const { allowance0, allowance1, approve, swap, isPending } = useMarket();
   const { isConnected } = useAccount();
 
   const [amountIn, setAmountIn] = useState("");
   const [zeroForOne, setZeroForOne] = useState(true);
 
-  const handleSwap = () => {
+  const amountBI = amountIn && !isNaN(Number(amountIn)) ? BigInt(amountIn) : 0n;
+  const currentAllowance = zeroForOne ? allowance0 : allowance1;
+  const needsApproval = amountBI > 0n && currentAllowance < amountBI;
+
+  const handleAction = () => {
     if (!amountIn || isNaN(Number(amountIn))) return;
-    swap(BigInt(amountIn), zeroForOne);
+    if (needsApproval) {
+      approve(zeroForOne);
+    } else {
+      swap(BigInt(amountIn), zeroForOne);
+    }
   };
 
   return (
@@ -58,7 +66,7 @@ export default function Market() {
                   placeholder="0.0"
                 />
                 <div className="absolute right-4 top-1/2 -translate-y-1/2 text-red-500 font-bold">
-                  {zeroForOne ? "TOKEN 0" : "TOKEN 1"}
+                  {zeroForOne ? "SCRAP" : "BATTERY"}
                 </div>
               </div>
             </div>
@@ -82,17 +90,21 @@ export default function Market() {
                   className="w-full bg-black/30 border border-red-500/10 p-4 text-white font-mono cursor-not-allowed"
                 />
                 <div className="absolute right-4 top-1/2 -translate-y-1/2 text-red-500/50 font-bold">
-                  {zeroForOne ? "TOKEN 1" : "TOKEN 0"}
+                  {zeroForOne ? "BATTERY" : "SCRAP"}
                 </div>
               </div>
             </div>
 
             <button 
-              onClick={handleSwap}
+              onClick={handleAction}
               disabled={!isConnected || isPending || !amountIn}
               className="w-full text-xl py-4 mt-6 flex items-center justify-center gap-3 bg-red-500/20 text-red-500 border border-red-500/50 hover:bg-red-500 hover:text-white transition-all uppercase tracking-wider font-bold shadow-[0_0_15px_rgba(239,68,68,0.2)] disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {isPending ? <span className="animate-pulse">SWAPPING...</span> : "EXECUTE TRADE"}
+              {isPending ? (
+                <span className="animate-pulse">{needsApproval ? "APPROVING..." : "SWAPPING..."}</span>
+              ) : (
+                needsApproval ? `APPROVE ${zeroForOne ? "SCRAP" : "BATTERY"}` : "EXECUTE TRADE"
+              )}
             </button>
           </div>
         </div>

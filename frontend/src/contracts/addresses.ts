@@ -7,5 +7,6 @@ export const CONTRACT_ADDRESSES = {
   craftingEngine: "0xbb04d8ce31d01D54A4901DB41429Db220bcA4472" as const,
   burrowVault:    "0x7b01162bCA09777B394A005285286C8EE5059fa4" as const,
   scrapToken:     "0x38C9d853184b4900758659a1c631De234CA3f229" as const,
+  batteryToken:   "0x41B2F9057Cb56B95aC0E5aA5Ee1B941Ae434Ea50" as const,
   gameGovernor:   "0x0000000000000000000000000000000000000000" as const,
 };
