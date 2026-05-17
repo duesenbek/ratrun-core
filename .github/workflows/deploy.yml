@@ -40,6 +40,12 @@ jobs:
           BASESCAN_API_KEY: ${{ secrets.BASESCAN_API_KEY }}
           TREASURY_ADDRESS: ${{ secrets.TREASURY_ADDRESS }}
         run: |
+          # Ensure PRIVATE_KEY starts with 0x for foundry parsing
+          if [[ ! "$PRIVATE_KEY" =~ ^0x ]]; then
+            echo "Formatting PRIVATE_KEY with 0x prefix..."
+            export PRIVATE_KEY="0x$PRIVATE_KEY"
+          fi
+
           # Use fallback public RPC if secret is empty
           RPC_URL="${BASE_SEPOLIA_RPC_URL:-https://sepolia.base.org}"
           echo "Using RPC URL: $RPC_URL"
