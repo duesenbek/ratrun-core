@@ -94,6 +94,13 @@ contract ResourceAMM_InvariantHandler is Test {
         {} catch {}
         vm.stopPrank();
     }
+
+    /// @dev Drain treasury fees so they don't cause solvency invariant failures.
+    function collectFees() external {
+        address treas = amm.treasury();
+        vm.prank(treas);
+        try amm.collectTreasuryFees() {} catch {}
+    }
 }
 
 /// @title ResourceAMM_InvariantTest
