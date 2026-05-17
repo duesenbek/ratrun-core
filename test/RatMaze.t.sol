@@ -214,7 +214,7 @@ contract RatMazeTest is Test {
         uint256 scrap2 = items.balanceOf(player, 0);
 
         assertEq(scrap1, scrap2,
-            "Scrap amount changed with prevrandao — indicates illegal randomness source");
+            "Scrap amount changed with prevrandao - indicates illegal randomness source");
         assertEq(lootProvider.callCount(), 2,
             "Expected exactly 2 VRF requests total");
     }
