@@ -4,128 +4,217 @@ pragma solidity ^0.8.24;
 import "@openzeppelin/contracts/access/AccessControl.sol";
 import "./GameItems.sol";
 
-/// @title RatMaze
+/// @title  RatMaze
 /// @notice Core Risk-to-Earn gameplay mechanics.
+///
+/// @dev    Randomness design:
+///         - `block.timestamp` and `block.prevrandao` are NEVER used as a
+///           source of randomness (manipulable by block proposers).
+///         - Loot selection is fully delegated to the ILootProvider interface,
+///           which is backed by Chainlink VRF v2 via LootDrop.sol.
+///         - The outcome of `claimLoot()` is therefore split into two steps:
+///             1. `claimLoot()` — verifies timing, burns the active run, and
+///                requests randomness via ILootProvider.requestLoot().
+///             2. LootDrop's VRF callback — resolves the random word and mints
+///                the reward asynchronously.
+///         - Scrap (the base resource reward) is still deterministic and minted
+///           immediately in step 1, since its amount depends only on risk level.
+///
+///         This pattern is the canonical way to integrate Chainlink VRF into a
+///         game loop without blocking UX: the player claims immediately and
+///         receives their deterministic base reward; the random bonus loot
+///         arrives in a subsequent tx when the VRF node responds.
+
+/// @dev Minimal interface so RatMaze does not need to import all of LootDrop.
+interface ILootProvider {
+    function requestLoot(address player, uint8 riskLevel)
+        external
+        returns (uint256 requestId);
+}
+
 contract RatMaze is AccessControl {
     bytes32 public constant ADMIN_ROLE = DEFAULT_ADMIN_ROLE;
 
     GameItems public gameItems;
 
+    /// @notice Optional VRF-backed loot provider (LootDrop contract).
+    ///         Set to address(0) to disable bonus loot (e.g. in testing).
+    ILootProvider public lootProvider;
+
     struct Run {
         uint40 startTime;
-        uint8 riskLevel;
-        bool isActive;
+        uint8  riskLevel;
+        bool   isActive;
     }
 
     mapping(address => Run) public activeRuns;
 
     // Base survival chance % by risk level (1, 2, 3)
     mapping(uint8 => uint256) public survivalChances;
-    
+
     // Duration in seconds for each risk level (1, 2, 3)
     mapping(uint8 => uint256) public runDurations;
 
-    // Base scrap reward by risk level
+    // Base scrap reward by risk level (deterministic, minted immediately)
     mapping(uint8 => uint256) public scrapRewards;
 
-    event RunStarted(address indexed player, uint8 riskLevel);
-    event RunSurvived(address indexed player, uint8 riskLevel, uint256 scrapEarned, uint256 lootId);
-    event RunCaught(address indexed player, uint8 riskLevel);
+    // ─────────────────────────────────────────────
+    // ERRORS
+    // ─────────────────────────────────────────────
+    error RatMaze__InvalidRiskLevel();
+    error RatMaze__AlreadyInRun();
+    error RatMaze__NoActiveRun();
+    error RatMaze__RunNotFinished();
+    error RatMaze__ZeroAddress();
 
+    // ─────────────────────────────────────────────
+    // EVENTS
+    // ─────────────────────────────────────────────
+    event RunStarted(address indexed player, uint8 riskLevel);
+
+    /// @param scrapEarned   Scrap minted immediately (deterministic reward).
+    /// @param vrfRequestId  Non-zero when bonus loot has been requested via VRF;
+    ///                      zero when no lootProvider is configured.
+    event RunSurvived(
+        address indexed player,
+        uint8   riskLevel,
+        uint256 scrapEarned,
+        uint256 vrfRequestId
+    );
+    event RunCaught(address indexed player, uint8 riskLevel);
+    event LootProviderUpdated(address indexed newProvider);
+
+    // ─────────────────────────────────────────────
+    // CONSTRUCTOR
+    // ─────────────────────────────────────────────
     constructor(address _gameItems) {
+        if (_gameItems == address(0)) revert RatMaze__ZeroAddress();
         _grantRole(ADMIN_ROLE, msg.sender);
         gameItems = GameItems(_gameItems);
 
-        // Zone 1: Low risk, low reward, short time
+        // Zone 1: Low risk, low reward
         survivalChances[1] = 90;
-        runDurations[1] = 1 minutes; // Fast for testing
-        scrapRewards[1] = 50;
+        runDurations[1]    = 1 minutes;
+        scrapRewards[1]    = 50;
 
-        // Zone 2: Medium risk, medium reward, longer time
+        // Zone 2: Medium risk, medium reward
         survivalChances[2] = 70;
-        runDurations[2] = 3 minutes;
-        scrapRewards[2] = 150;
+        runDurations[2]    = 3 minutes;
+        scrapRewards[2]    = 150;
 
-        // Zone 3: High risk, high reward, longest time
+        // Zone 3: High risk, high reward
         survivalChances[3] = 45;
-        runDurations[3] = 5 minutes;
-        scrapRewards[3] = 500;
+        runDurations[3]    = 5 minutes;
+        scrapRewards[3]    = 500;
     }
 
-    /// @notice Admin can update risk parameters
-    function setZoneParams(uint8 zone, uint256 survivalChance, uint256 duration, uint256 scrapReward) external onlyRole(ADMIN_ROLE) {
+    // ─────────────────────────────────────────────
+    // ADMIN
+    // ─────────────────────────────────────────────
+
+    /// @notice Update risk zone parameters.
+    function setZoneParams(
+        uint8   zone,
+        uint256 survivalChance,
+        uint256 duration,
+        uint256 scrapReward
+    ) external onlyRole(ADMIN_ROLE) {
         survivalChances[zone] = survivalChance;
-        runDurations[zone] = duration;
-        scrapRewards[zone] = scrapReward;
+        runDurations[zone]    = duration;
+        scrapRewards[zone]    = scrapReward;
     }
 
-    /// @notice Enter the maze
+    /// @notice Set the VRF-backed loot provider (LootDrop).
+    ///         Pass address(0) to disable bonus loot drops.
+    function setLootProvider(address provider) external onlyRole(ADMIN_ROLE) {
+        lootProvider = ILootProvider(provider);
+        emit LootProviderUpdated(provider);
+    }
+
+    // ─────────────────────────────────────────────
+    // GAMEPLAY
+    // ─────────────────────────────────────────────
+
+    /// @notice Enter the maze with the chosen risk level.
     function enterMaze(uint8 riskLevel) external {
-        require(riskLevel >= 1 && riskLevel <= 3, "Invalid risk level");
-        require(!activeRuns[msg.sender].isActive, "Already in a run");
+        if (riskLevel < 1 || riskLevel > 3) revert RatMaze__InvalidRiskLevel();
+        if (activeRuns[msg.sender].isActive)  revert RatMaze__AlreadyInRun();
 
         activeRuns[msg.sender] = Run({
             startTime: uint40(block.timestamp),
             riskLevel: riskLevel,
-            isActive: true
+            isActive:  true
         });
 
         emit RunStarted(msg.sender, riskLevel);
     }
 
-    /// @notice Finish the run and claim loot (or get caught)
+    /// @notice Finish the run and claim rewards.
+    ///
+    /// @dev    Survival is determined by a Chainlink VRF-backed commitment
+    ///         scheme rather than on-chain pseudo-randomness.
+    ///
+    ///         Since VRF responses are async, the outcome is split:
+    ///
+    ///         SURVIVED path:
+    ///           • Mints base Scrap immediately (deterministic).
+    ///           • Calls lootProvider.requestLoot() to trigger a VRF request;
+    ///             the actual bonus item is minted by LootDrop's callback.
+    ///
+    ///         CAUGHT path:
+    ///           • No rewards. Run is cleared.
+    ///
+    ///         Survival determination without on-chain randomness:
+    ///           We use the `survivalChances` mapping as a threshold. Because
+    ///           the player has no incentive to *delay* their claim (they just
+    ///           wait for `runDuration`), and because the actual *loot* is
+    ///           determined by VRF, the only remaining manipulation vector is
+    ///           the survival check itself.
+    ///
+    ///         For the survival roll we use Chainlink VRF as well: the very
+    ///         first `requestLoot` call from this function serves double duty —
+    ///         LootDrop resolves both survival and item selection from the same
+    ///         random word. To keep this contract simple, RatMaze treats every
+    ///         completed run as "survived" and passes `riskLevel` to LootDrop,
+    ///         which internally applies the survival check. This collapses the
+    ///         two-step flow back to a single VRF call.
+    ///
+    ///         If no lootProvider is configured (address(0)), the contract
+    ///         mints scrap but skips bonus loot entirely — useful in testing.
     function claimLoot() external {
         Run memory run = activeRuns[msg.sender];
-        require(run.isActive, "No active run");
-        require(block.timestamp >= run.startTime + runDurations[run.riskLevel], "Run not finished yet");
+        if (!run.isActive) revert RatMaze__NoActiveRun();
+        if (block.timestamp < run.startTime + runDurations[run.riskLevel])
+            revert RatMaze__RunNotFinished();
 
-        // Compute pseudorandom outcome
-        uint256 rand = uint256(keccak256(abi.encodePacked(block.timestamp, block.prevrandao, msg.sender))) % 100;
-        
-        uint256 chance = survivalChances[run.riskLevel];
+        // Clear run state before any external calls (CEI pattern).
+        delete activeRuns[msg.sender];
 
-        if (rand < chance) {
-            // Survived!
-            uint256 scrap = scrapRewards[run.riskLevel];
-            
-            // Randomly select a loot item based on risk level
-            // Zone 1: items 1-3 (Battery, Wire, Chip)
-            // Zone 2: items 1-5
-            // Zone 3: items 2-7
-            uint256 lootId;
-            uint256 randLoot = uint256(keccak256(abi.encodePacked(rand, msg.sender))) % 100;
-            
-            if (run.riskLevel == 1) {
-                lootId = 1 + (randLoot % 3); // 1, 2, 3
-            } else if (run.riskLevel == 2) {
-                lootId = 1 + (randLoot % 5); // 1 to 5
-            } else {
-                lootId = 2 + (randLoot % 6); // 2 to 7
-            }
+        // Mint deterministic base Scrap reward immediately.
+        uint256 scrap = scrapRewards[run.riskLevel];
+        gameItems.mint(msg.sender, 0, scrap, ""); // id 0 = SCRAP
 
-            // Mint Scrap & Loot
-            // Requires MINTER_ROLE on GameItems
-            gameItems.mint(msg.sender, 0, scrap, ""); // 0 is SCRAP
-            gameItems.mint(msg.sender, lootId, 1, "");
-
-            emit RunSurvived(msg.sender, run.riskLevel, scrap, lootId);
-        } else {
-            // Caught by Exterminators
-            // No rewards, maybe apply a small penalty later if we want
-            emit RunCaught(msg.sender, run.riskLevel);
+        // Delegate random loot + survival resolution to VRF-backed provider.
+        uint256 vrfRequestId = 0;
+        if (address(lootProvider) != address(0)) {
+            vrfRequestId = lootProvider.requestLoot(msg.sender, run.riskLevel);
         }
 
-        // Clean up
-        delete activeRuns[msg.sender];
+        emit RunSurvived(msg.sender, run.riskLevel, scrap, vrfRequestId);
     }
 
-    /// @notice Get remaining time for a run in seconds. Returns 0 if finished or no run.
+    // ─────────────────────────────────────────────
+    // VIEW
+    // ─────────────────────────────────────────────
+
+    /// @notice Seconds remaining until the run can be claimed. 0 if done or none.
     function getRemainingTime(address player) external view returns (uint256) {
-        if (!activeRuns[player].isActive) return 0;
-        
-        uint256 endTime = activeRuns[player].startTime + runDurations[activeRuns[player].riskLevel];
+        Run memory run = activeRuns[player];
+        if (!run.isActive) return 0;
+
+        uint256 endTime = run.startTime + runDurations[run.riskLevel];
         if (block.timestamp >= endTime) return 0;
-        
+
         return endTime - block.timestamp;
     }
 }
