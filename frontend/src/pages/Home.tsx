@@ -1,13 +1,17 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { useAccount } from "wagmi";
+import { useAccount, useSwitchChain } from "wagmi";
+import { baseSepolia } from "wagmi/chains";
 import { Terminal, Pickaxe, Vault, Users, ShoppingCart, Crosshair, Zap, Shield, ChevronRight, Activity } from "lucide-react";
 import gmSticker from "../assets/stickers/gm.png";
 import { useRatMaze } from "../hooks/useRatMaze";
 import { useInventory } from "../hooks/useInventory";
 
 export default function Home() {
-  const { isConnected } = useAccount();
+  const { isConnected, chain } = useAccount();
+  const { switchChain } = useSwitchChain();
+  const isWrongNetwork = isConnected && chain?.id !== baseSepolia.id;
+
   const [selectedZone, setSelectedZone] = useState<number>(1);
   const [systemLogs, setSystemLogs] = useState<string[]>([
     "> [04:00:11] INITIALIZING RATRUN_OS... OK",
@@ -202,7 +206,14 @@ export default function Home() {
                 </div>
               </div>
 
-              {!isActive ? (
+              {isWrongNetwork ? (
+                <button 
+                  onClick={() => switchChain({ chainId: baseSepolia.id })}
+                  className="w-full text-xl py-4 flex items-center justify-center gap-3 bg-red-500/20 text-red-500 border border-red-500/50 hover:bg-red-500 hover:text-white transition-all uppercase tracking-wider font-bold animate-pulse"
+                >
+                  SWITCH TO BASE SEPOLIA
+                </button>
+              ) : !isActive ? (
                 <button 
                   onClick={handleDeploy}
                   disabled={!isConnected || isPending}
