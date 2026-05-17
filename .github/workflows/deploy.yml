@@ -53,7 +53,7 @@ jobs:
             echo "No BaseScan API Key detected. Skipping verification."
           fi
           
-          forge script script/DeployAll.s.sol \
+          forge script script/DeployAll.s.sol:DeployAll \
             --rpc-url "$RPC_URL" \
             --broadcast \
             $VERIFY_FLAGS \
