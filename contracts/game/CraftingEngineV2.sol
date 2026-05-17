@@ -11,7 +11,7 @@ contract CraftingEngineV2 is CraftingEngine {
 
     event RarityMultiplierSet(uint256 indexed itemId, uint256 multiplierBps);
 
-    function initializeV2() external reinitializer(2) {
+    function initializeV2() external onlyRole(DEFAULT_ADMIN_ROLE) reinitializer(2) {
         rarityMultiplier[0] = 10000; // SCRAP   - COMMON
         rarityMultiplier[1] = 10000; // BATTERY - COMMON
         rarityMultiplier[2] = 10000; // WIRE    - COMMON

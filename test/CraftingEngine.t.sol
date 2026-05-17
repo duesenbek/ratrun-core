@@ -17,7 +17,7 @@ contract CraftingEngineTest is Test {
     address public player = makeAddr("player");
     address public attacker = makeAddr("attacker");
 
-    string constant URI = "https://ratrun.io/api/items/{id}.json";
+    string constant URI = "";
 
     // Item IDs
     uint256 constant SCRAP = 0;

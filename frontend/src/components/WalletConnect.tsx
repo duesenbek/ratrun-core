@@ -2,7 +2,7 @@ import { useAccount, useConnect, useDisconnect } from "wagmi";
 
 export default function WalletConnect() {
   const { address, isConnected } = useAccount();
-  const { connect, connectors, isLoading, pendingConnector } = useConnect();
+  const { connect, connectors } = useConnect();
   const { disconnect } = useDisconnect();
 
   if (isConnected) {
@@ -29,9 +29,7 @@ export default function WalletConnect() {
           onClick={() => connect({ connector })}
           className="text-xs border border-primary text-primary px-3 py-1 hover:bg-primary hover:text-background transition-colors uppercase"
         >
-          {isLoading && connector.id === pendingConnector?.id
-            ? "CONNECTING..."
-            : connector.name}
+          {connector.name}
         </button>
       ))}
     </div>

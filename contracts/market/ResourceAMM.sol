@@ -295,7 +295,7 @@ contract ResourceAMM is IResourceAMM, ReentrancyGuard, Ownable {
         // We calculate the fee on the gross amountIn.
         uint256 treasuryFee = (amountIn * TREASURY_FEE_BPS) / FEE_DENOMINATOR;
 
-        // ── Effects: update reserves ──────────────
+                // ── Effects: update reserves ──────────────
         if (zeroForOne) {
             // Selling token0, buying token1
             treasuryFees0 += treasuryFee;
@@ -312,15 +312,15 @@ contract ResourceAMM is IResourceAMM, ReentrancyGuard, Ownable {
             );
         }
 
+        // k invariant sanity check (CEI: check BEFORE interactions)
+        _checkK(_reserve0, _reserve1);
+
         // ── Interactions ──────────────────────────
         IERC20 tokenIn = zeroForOne ? token0 : token1;
         IERC20 tokenOut = zeroForOne ? token1 : token0;
 
         tokenIn.safeTransferFrom(msg.sender, address(this), amountIn);
         tokenOut.safeTransfer(to, amountOut);
-
-        // k invariant sanity check (post-interaction)
-        _checkK(_reserve0, _reserve1);
 
         emit Swap(msg.sender, amountIn, amountOut, zeroForOne, to);
     }
@@ -409,10 +409,13 @@ contract ResourceAMM is IResourceAMM, ReentrancyGuard, Ownable {
         reserve1 = uint128(newReserve1);
     }
 
-    /// @dev Assert k_after >= k_before. Reverts if the invariant is broken.
+        /// @dev Assert k_after >= k_before. Reverts if the invariant is broken.
+    ///      Reserves are uint128, so product fits in uint256 safely.
     function _checkK(uint256 prevReserve0, uint256 prevReserve1) internal view {
-        uint256 kBefore = prevReserve0 * prevReserve1;
-        uint256 kAfter = uint256(reserve0) * uint256(reserve1);
-        if (kAfter < kBefore) revert AMM__K_Violated();
+        unchecked {
+            uint256 kBefore = prevReserve0 * prevReserve1;
+            uint256 kAfter = uint256(reserve0) * uint256(reserve1);
+            if (kAfter < kBefore) revert AMM__K_Violated();
+        }
     }
 }

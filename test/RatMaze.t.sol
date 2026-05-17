@@ -30,7 +30,7 @@ contract RatMazeTest is Test {
     address public player = address(0x1337);
 
     function setUp() public {
-        items        = new GameItems("https://api.ratrun.io/metadata/");
+        items        = new GameItems("");
         maze         = new RatMaze(address(items));
         lootProvider = new MockLootProvider();
 

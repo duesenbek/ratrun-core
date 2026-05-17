@@ -24,7 +24,7 @@ contract DeployScript is Script {
         vm.startBroadcast(deployerPrivateKey);
 
         // 1. Deploy GameItems
-        string memory baseURI = "https://ratrun.io/api/items/{id}.json";
+        string memory baseURI = "";
         GameItems items = new GameItems(baseURI);
         console.log("GameItems deployed at:", address(items));
 

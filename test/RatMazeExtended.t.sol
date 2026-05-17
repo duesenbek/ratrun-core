@@ -21,7 +21,7 @@ contract RatMazeExtendedTest is Test {
     address player2 = makeAddr("player2");
 
     function setUp() public {
-        items = new GameItems("https://ratrun.io/api/items/{id}.json");
+        items = new GameItems("");
         maze  = new RatMaze(address(items));
         items.grantRole(items.MINTER_ROLE(), address(maze));
 

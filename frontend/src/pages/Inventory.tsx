@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { Package, Shield, Zap, Cpu, Wrench } from "lucide-react";
 
 // Mock data based on GameItems.sol
