@@ -1,7 +1,7 @@
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { http, createConfig, WagmiProvider } from "wagmi";
-import { mainnet, sepolia, baseSepolia } from "wagmi/chains";
+import { baseSepolia } from "wagmi/chains";
 import WalletConnect from "./components/WalletConnect";
 import Home from "./pages/Home";
 
@@ -15,12 +15,10 @@ import LootAnimation from "./components/LootAnimation";
 // Setup query client
 const queryClient = new QueryClient();
 
-// Setup Wagmi config
+// Setup Wagmi config - exclusively use Base Sepolia to prevent mainnet prompts
 const config = createConfig({
-  chains: [mainnet, sepolia, baseSepolia],
+  chains: [baseSepolia],
   transports: {
-    [mainnet.id]: http(),
-    [sepolia.id]: http(),
     [baseSepolia.id]: http(),
   },
 });
